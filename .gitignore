@@ -13,3 +13,5 @@ models/*
 !data/processed/.gitkeep
 !data/annotations/.gitkeep
 !models/.gitkeep
+!models/yolo/
+!models/yolo/.gitkeep

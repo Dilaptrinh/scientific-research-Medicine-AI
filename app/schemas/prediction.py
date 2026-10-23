@@ -5,6 +5,7 @@ class Detection(BaseModel):
     label: str
     confidence: float = Field(ge=0, le=1)
     bounding_box: tuple[float, float, float, float]
+    crop_path: str | None = None
 
 
 class PredictionResponse(BaseModel):

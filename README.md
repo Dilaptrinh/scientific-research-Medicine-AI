@@ -75,6 +75,43 @@ Kết quả:
 Endpoint dự đoán hiện trả `501 Not Implemented`. Đây là hành vi có chủ đích:
 chưa tích hợp model thật thì không được trả kết quả giả.
 
+## 3.1. Đưa model YOLO hiện có vào project
+
+Code adapter YOLO nằm tại
+[`app/services/detection.py`](./app/services/detection.py). Model weights không
+được commit vào Git. Hãy tạo thư mục `models/yolo/` và copy file:
+
+```text
+D:\My_File\code\python\New folder\Model\Mo_Hinh_YOLO\best.pt
+```
+
+vào:
+
+```text
+models/yolo/best.pt
+```
+
+Cài thêm dependency cho YOLO:
+
+```powershell
+pip install -e ".[ml,dev]"
+```
+
+Adapter nhận ảnh OpenCV dạng `numpy.ndarray`, chạy YOLO, lưu các crop vào
+`data/processed/` và trả mỗi detection theo format:
+
+```json
+{
+  "label": "hop",
+  "confidence": 0.92,
+  "bounding_box": [100, 80, 350, 500],
+  "crop_path": "data/processed/image_001_crop_0.jpg"
+}
+```
+
+Hiện adapter chưa tự nối vào `/predict`; bước tiếp theo là inject detector vào
+`pipeline.py` và route sau khi thống nhất cách lưu file upload.
+
 ## 4. Cấu trúc thư mục
 
 ```text
