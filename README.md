@@ -72,8 +72,9 @@ Kết quả:
 {"status": "ok"}
 ```
 
-Endpoint dự đoán hiện trả `501 Not Implemented`. Đây là hành vi có chủ đích:
-chưa tích hợp model thật thì không được trả kết quả giả.
+Ở skeleton ban đầu, endpoint dự đoán trả `501 Not Implemented` vì chưa tích hợp
+model thật. Branch tích hợp bên dưới chuyển endpoint sang pipeline thật, nhưng
+chỉ chạy được sau khi có đủ hai weights tương thích.
 
 ## 3.1. Đưa model YOLO hiện có vào project
 
@@ -109,8 +110,63 @@ Adapter nhận ảnh OpenCV dạng `numpy.ndarray`, chạy YOLO, lưu các crop 
 }
 ```
 
-Hiện adapter chưa tự nối vào `/predict`; bước tiếp theo là inject detector vào
-`pipeline.py` và route sau khi thống nhất cách lưu file upload.
+## 3.2. Branch YOLO + MobileNet phân loại loại vật thể
+
+Branch triển khai phần này là:
+
+```text
+feature/yolo-mobilenet-type-classification
+```
+
+Luồng của branch:
+
+```text
+POST /api/v1/predict
+    -> YOLO phát hiện từng vùng
+    -> lưu crop
+    -> MobileNetV3 phân loại mỗi crop: hop, vi hoặc thuoc
+    -> trả bounding box + hai confidence
+```
+
+Code nằm ở:
+
+```text
+app/services/detection.py       # YOLO
+app/services/classification.py  # MobileNetV3 3 lớp
+app/services/pipeline.py        # nối hai model
+app/api/routes.py               # endpoint upload ảnh
+```
+
+MobileNet hiện có trong thư mục cũ (`mobilenet_thuoc_best*.pth`) là model phân
+loại **tên thuốc**, không phải model 3 lớp `hop/vi/thuoc`, nên không được đổi
+tên rồi dùng nhầm vào branch này. Cần đặt checkpoint đã train đúng 3 lớp tại:
+
+```text
+models/mobilenet/type_classifier.pth
+```
+
+Endpoint trả dạng:
+
+```json
+{
+  "image_id": "generated-id",
+  "detections": [
+    {
+      "label": "hop",
+      "confidence": 0.92,
+      "bounding_box": [100, 80, 350, 500],
+      "crop_path": "data/processed/generated-id_crop_0.jpg",
+      "classification": {
+        "label": "hop",
+        "confidence": 0.96
+      }
+    }
+  ]
+}
+```
+
+Nếu chưa có `type_classifier.pth`, endpoint sẽ không được xem là đã hoàn
+thiện; hãy train model 3 lớp trước khi tạo PR merge vào `main`.
 
 ## 4. Cấu trúc thư mục
 
