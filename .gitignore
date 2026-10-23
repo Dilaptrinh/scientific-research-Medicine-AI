@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.pt
+*.pth
+*.onnx
+data/raw/*
+data/processed/*
+data/annotations/*
+models/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/annotations/.gitkeep
+!models/.gitkeep
