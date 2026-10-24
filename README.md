@@ -178,6 +178,7 @@ app/services/pill_embedding.py
 app/services/retrieval.py
 scripts/build_pill_index.py
 scripts/search_pill.py
+scripts/run_pill_search.py
 tests/test_retrieval.py
 data/pill_dataset/
 data/pill_queries/
@@ -195,6 +196,14 @@ Có thể test ngay bằng MobileNetV3 pretrained, chưa cần checkpoint đã f
 pip install -e ".[ml,retrieval,dev]"
 python scripts/build_pill_index.py
 python scripts/search_pill.py data/pill_queries/query.jpg
+```
+
+Hoặc chạy một lệnh duy nhất để tự build index nếu cần và nhập ảnh local hoặc
+URL trực tiếp:
+
+```powershell
+python scripts/run_pill_search.py "https://example.com/pill.jpg"
+python scripts/run_pill_search.py "data/pill_queries/query.jpg"
 ```
 
 `build_pill_index.py` đọc đệ quy ảnh từ `data/pill_dataset/<medicine_id>/`

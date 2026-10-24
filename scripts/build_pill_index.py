@@ -11,29 +11,27 @@ from app.services.pill_embedding import (
 from app.services.retrieval import FaissPillIndex, PillReference
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Build a FAISS index from medicine-labelled pill folders."
-    )
-    parser.add_argument("--dataset", type=Path, default=Path("data/pill_dataset"))
-    parser.add_argument("--output", type=Path, default=Path("data/pill_index"))
-    parser.add_argument("--checkpoint", type=Path, default=None)
-    args = parser.parse_args()
-
+def build_index(
+    dataset: Path,
+    output: Path,
+    checkpoint: Path | None = None,
+    embedder: MobileNetPillEmbedder | None = None,
+) -> None:
     image_paths = sorted(
         path
-        for path in args.dataset.rglob("*")
+        for path in dataset.rglob("*")
         if path.is_file()
         and path.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}
     )
     if not image_paths:
         raise FileNotFoundError(
-            f"No pill images found in medicine subfolders: {args.dataset}"
+            f"No pill images found in medicine subfolders: {dataset}"
         )
 
-    embedder = MobileNetPillEmbedder(
-        PillEmbeddingConfig(checkpoint_path=args.checkpoint)
-    )
+    if embedder is None:
+        embedder = MobileNetPillEmbedder(
+            PillEmbeddingConfig(checkpoint_path=checkpoint)
+        )
     embeddings = []
     references = []
     for image_path in image_paths:
@@ -52,8 +50,19 @@ def main() -> None:
 
     index = FaissPillIndex(embedder.embedding_dim)
     index.add(np.stack(embeddings), references)
-    index.save(args.output / "pills.index", args.output / "pills.json")
-    print(f"Indexed {len(references)} images into {args.output}")
+    index.save(output / "pills.index", output / "pills.json")
+    print(f"Indexed {len(references)} images into {output}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Build a FAISS index from medicine-labelled pill folders."
+    )
+    parser.add_argument("--dataset", type=Path, default=Path("data/pill_dataset"))
+    parser.add_argument("--output", type=Path, default=Path("data/pill_index"))
+    parser.add_argument("--checkpoint", type=Path, default=None)
+    args = parser.parse_args()
+    build_index(args.dataset, args.output, args.checkpoint)
 
 
 if __name__ == "__main__":
