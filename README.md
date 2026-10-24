@@ -3,8 +3,8 @@
 Backend skeleton cho nghiên cứu nhận diện nhiều loại thuốc trong một ảnh:
 
 ```text
-Ảnh thuốc -> YOLO detection/crop -> MobileNet classification
-           -> few-shot embedding -> FAISS retrieval -> VLM trả lời
+Ảnh thuốc -> YOLO detection/crop
+           -> few-shot embedding cho ảnh viên -> FAISS retrieval -> VLM trả lời
 ```
 
 > Đây là dự án nghiên cứu. Kết quả nhận diện không thay thế tư vấn của bác sĩ
@@ -72,9 +72,7 @@ Kết quả:
 {"status": "ok"}
 ```
 
-Ở skeleton ban đầu, endpoint dự đoán trả `501 Not Implemented` vì chưa tích hợp
-model thật. Branch tích hợp bên dưới chuyển endpoint sang pipeline thật, nhưng
-chỉ chạy được sau khi có đủ hai weights tương thích.
+Endpoint dự đoán hiện chỉ tích hợp YOLO detection/crop và cần có YOLO weights.
 
 ## 3.1. Đưa model YOLO hiện có vào project
 
@@ -110,64 +108,6 @@ Adapter nhận ảnh OpenCV dạng `numpy.ndarray`, chạy YOLO, lưu các crop 
 }
 ```
 
-## 3.2. Branch YOLO + MobileNet phân loại loại vật thể
-
-Branch triển khai phần này là:
-
-```text
-feature/yolo-mobilenet-type-classification
-```
-
-Luồng của branch:
-
-```text
-POST /api/v1/predict
-    -> YOLO phát hiện từng vùng
-    -> lưu crop
-    -> MobileNetV3 phân loại mỗi crop: hop, vi hoặc thuoc
-    -> trả bounding box + hai confidence
-```
-
-Code nằm ở:
-
-```text
-app/services/detection.py       # YOLO
-app/services/classification.py  # MobileNetV3 3 lớp
-app/services/pipeline.py        # nối hai model
-app/api/routes.py               # endpoint upload ảnh
-```
-
-MobileNet hiện có trong thư mục cũ (`mobilenet_thuoc_best*.pth`) là model phân
-loại **tên thuốc**, không phải model 3 lớp `hop/vi/thuoc`, nên không được đổi
-tên rồi dùng nhầm vào branch này. Cần đặt checkpoint đã train đúng 3 lớp tại:
-
-```text
-models/mobilenet/type_classifier.pth
-```
-
-Endpoint trả dạng:
-
-```json
-{
-  "image_id": "generated-id",
-  "detections": [
-    {
-      "label": "hop",
-      "confidence": 0.92,
-      "bounding_box": [100, 80, 350, 500],
-      "crop_path": "data/processed/generated-id_crop_0.jpg",
-      "classification": {
-        "label": "hop",
-        "confidence": 0.96
-      }
-    }
-  ]
-}
-```
-
-Nếu chưa có `type_classifier.pth`, endpoint sẽ không được xem là đã hoàn
-thiện; hãy train model 3 lớp trước khi tạo PR merge vào `main`.
-
 ## 4. Cấu trúc thư mục
 
 ```text
@@ -178,9 +118,7 @@ app/
   schemas/
     prediction.py      # Format input/output chuẩn
   services/
-    pipeline.py        # Interface điều phối pipeline
-    detection.py       # Sẽ chứa adapter YOLO
-    classification.py  # Sẽ chứa adapter MobileNet
+    detection.py       # Adapter YOLO và lưu crop
     retrieval.py       # Sẽ chứa adapter FAISS
     vlm.py             # Sẽ chứa adapter VLM
   main.py              # Khởi tạo FastAPI
@@ -189,6 +127,9 @@ data/
   raw/                 # Ảnh gốc; không commit ảnh thật
   processed/           # Ảnh crop và kết quả tiền xử lý
   annotations/         # Nhãn YOLO và metadata
+  pill_dataset/        # Ảnh train embedding, chia theo tên thuốc
+  pill_queries/        # Ảnh viên dùng để truy vấn
+  pill_index/          # FAISS index và metadata
 
 models/                # Weights/index; không commit file lớn
 tests/                 # Unit/API tests
@@ -211,16 +152,8 @@ YOLO nhận ảnh gốc và trả các detection/crop:
 }
 ```
 
-MobileNet nhận một crop và trả:
-
-```python
-{
-    "label": "paracetamol",
-    "confidence": 0.91,
-}
-```
-
-FAISS nhận embedding của crop và trả các kết quả gần nhất kèm metadata. VLM
+Embedding model nhận ảnh viên thuốc và trả vector. FAISS nhận vector đó và trả
+các kết quả gần nhất kèm metadata. VLM
 chỉ tổng hợp từ ảnh và các kết quả có nguồn, không tự thay thế dữ liệu model.
 
 ## 6. Cách chia việc
@@ -236,25 +169,24 @@ app/services/detection.py
 
 Phụ trách thu thập ảnh, gán bounding box, train YOLO, inference và crop.
 
-### Nhánh MobileNet/API
+### Nhánh few-shot ảnh viên
 
 ```text
-app/services/classification.py
-app/services/pipeline.py
-app/api/routes.py
-tests/
+notebooks/train_pill_embedding_colab.py
+data/pill_dataset/
+data/pill_queries/
+data/pill_index/
 ```
 
-Phụ trách phân loại crop, nối detector với classifier và kiểm thử API. Hai bên
-chỉ cần thống nhất schema/output, hạn chế sửa cùng một file.
+Phụ trách train embedding model cho ảnh viên, xây FAISS index và ánh xạ kết quả
+tới metadata thuốc.
 
 ### Các bước tiếp theo
 
 1. Hoàn thiện dataset và YOLO.
-2. Hoàn thiện MobileNet trên một crop.
-3. Nối YOLO và MobileNet trong `pipeline.py`.
-4. Thêm embedding few-shot và FAISS.
-5. Thêm VLM sau khi retrieval đã trả metadata đáng tin cậy.
+2. Train embedding model cho ảnh viên.
+3. Xây FAISS index và metadata.
+4. Thêm VLM sau khi retrieval đã trả metadata đáng tin cậy.
 
 ## 7. Quy trình Git và Pull Request
 

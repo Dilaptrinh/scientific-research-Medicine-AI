@@ -18,19 +18,13 @@ async def predict(image: UploadFile = File(...)) -> PredictionResponse:
     import cv2
     import numpy as np
 
-    from app.services.classification import MobileNetTypeClassifier
     from app.services.detection import YoloDetector
-    from app.services.pipeline import YoloMobileNetPipeline
 
     content = await image.read()
     decoded = cv2.imdecode(np.frombuffer(content, np.uint8), cv2.IMREAD_COLOR)
     if decoded is None:
         raise HTTPException(status_code=400, detail="Uploaded file is not a valid image.")
 
-    pipeline = YoloMobileNetPipeline(
-        detector=YoloDetector(Path("models/yolo/best.pt")),
-        classifier=MobileNetTypeClassifier(
-            Path("models/mobilenet/type_classifier.pth")
-        ),
-    )
-    return pipeline.run(decoded, uuid4().hex)
+    image_id = uuid4().hex
+    detections = YoloDetector(Path("models/yolo/best.pt")).detect(decoded, image_id)
+    return PredictionResponse(image_id=image_id, detections=detections)
