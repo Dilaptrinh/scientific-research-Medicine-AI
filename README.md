@@ -44,6 +44,23 @@ virtual environment:
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 ```
 
+Mỗi thành viên cần tự tạo `.venv` trên máy của mình. Không commit thư mục này
+vào Git; `.gitignore` đã bỏ qua nó. Khi làm việc, kiểm tra interpreter đang dùng:
+
+```powershell
+python -c "import sys; print(sys.executable)"
+```
+
+Kết quả phải trỏ tới `D:\My_File\code\NCKH\.venv\Scripts\python.exe` (hoặc
+đường dẫn project tương ứng trên máy thành viên).
+
+Dependency dùng chung được khai báo trong `pyproject.toml`:
+
+```powershell
+pip install -e ".[dev]"       # test và phát triển API
+pip install -e ".[ml,dev]"    # thêm YOLO/OpenCV/PyTorch
+```
+
 ## 3. Chạy và kiểm tra skeleton
 
 Chạy test:
@@ -180,24 +197,25 @@ app/services/detection.py
 
 Phụ trách thu thập ảnh, gán bounding box, train YOLO, inference và crop.
 
-### Nhánh MobileNet/API
+### Nhánh few-shot ảnh viên
 
 ```text
-app/services/classification.py
-app/services/pipeline.py
-app/api/routes.py
-tests/
+notebooks/train_pill_embedding_colab.py
+data/pill_dataset/
+data/pill_queries/
+data/pill_index/
 ```
 
-Phụ trách phân loại crop, nối detector với classifier và kiểm thử API. Hai bên
-chỉ cần thống nhất schema/output, hạn chế sửa cùng một file.
+Phụ trách fine-tune embedding model cho ảnh viên thuốc, xây FAISS index và ánh
+xạ kết quả tới metadata thuốc. Nhánh này không sửa phần MobileNet phân loại
+`hop/vi/thuoc` của nhánh khác.
 
 ### Các bước tiếp theo
 
 1. Hoàn thiện dataset và YOLO.
-2. Hoàn thiện MobileNet trên một crop.
-3. Nối YOLO và MobileNet trong `pipeline.py`.
-4. Thêm embedding few-shot và FAISS.
+2. Hoàn thiện MobileNet phân loại `hop/vi/thuoc`.
+3. Train embedding model cho ảnh viên.
+4. Xây FAISS index và metadata.
 5. Thêm VLM sau khi retrieval đã trả metadata đáng tin cậy.
 
 ## 7. Quy trình Git và Pull Request
@@ -207,12 +225,23 @@ chỉ cần thống nhất schema/output, hạn chế sửa cùng một file.
 ```text
 main
 ├── feature/data-preparation
-├── feature/yolo-detection
+├── feature/yolo
 ├── feature/mobilenet-classification
-├── feature/api-pipeline
-├── feature/faiss-retrieval
+├── feature/few-shot-rag-img
 └── feature/vlm-answering
 ```
+
+Quy ước hiện tại:
+
+- `main`: code đã review và tài liệu/quy ước dùng chung; không code trực tiếp.
+- `feature/yolo`: YOLO detection và crop, không bao gồm MobileNet phân loại.
+- `feature/mobilenet-classification`: MobileNet phân loại `hop`, `vi`, `thuoc`.
+- `feature/few-shot-rag-img`: embedding ảnh viên, FAISS và metadata nguồn.
+- `feature/vlm-answering`: tổng hợp câu trả lời từ ảnh, retrieval và tài liệu.
+
+Tên branch dùng chữ thường, dấu gạch ngang và mô tả đúng một task. Không dùng
+chung một branch cho nhiều task không liên quan. Nếu branch cần code từ branch
+khác, ghi rõ dependency trong PR và thống nhất schema giữa hai bên.
 
 Tạo branch mới:
 
@@ -236,6 +265,14 @@ Tạo Pull Request từ branch đó vào `main`. PR nên có:
 - Input/output của module
 - Lệnh test đã chạy
 - Phần chưa triển khai hoặc giới hạn hiện tại
+
+Trước khi tạo PR, chạy tối thiểu:
+
+```powershell
+python -m pytest
+git diff --check
+git status --short
+```
 
 Không commit secrets, ảnh người dùng, weights lớn hoặc dữ liệu thật vào
 repository. Không code trực tiếp trên `main`.
