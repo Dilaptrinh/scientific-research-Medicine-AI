@@ -94,6 +94,7 @@ Cài thêm dependency cho YOLO:
 
 ```powershell
 pip install -e ".[ml,dev]"
+pip install -e ".[retrieval]" # thêm FAISS để tìm kiếm vector
 ```
 
 Adapter nhận ảnh OpenCV dạng `numpy.ndarray`, chạy YOLO, lưu các crop vào

@@ -15,7 +15,7 @@ to create vectors that can later be indexed and searched with FAISS.
 """
 
 # In Colab, run this once in a separate cell if needed:
-# !pip install -q torch torchvision pillow
+# !pip install -q torch torchvision pillow faiss-cpu
 
 from pathlib import Path
 
