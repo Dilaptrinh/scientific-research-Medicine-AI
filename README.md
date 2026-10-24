@@ -197,7 +197,8 @@ python scripts/build_pill_index.py
 python scripts/search_pill.py data/pill_queries/query.jpg
 ```
 
-`build_pill_index.py` đọc ảnh từ `data/pill_dataset/<medicine_id>/`, tự tạo
+`build_pill_index.py` đọc đệ quy ảnh từ `data/pill_dataset/<medicine_id>/`
+(hoặc `data/pill_dataset/VIEN/<medicine_id>/`), tự tạo
 metadata tối thiểu từ tên folder và ghi index vào `data/pill_index/`. Lần chạy
 đầu MobileNetV3 pretrained có thể cần Internet để tải weights. Khi đã fine-tune
 embedding model, truyền checkpoint bằng `--checkpoint`.

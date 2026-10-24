@@ -22,8 +22,9 @@ def main() -> None:
 
     image_paths = sorted(
         path
-        for path in args.dataset.glob("*/*")
-        if path.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}
+        for path in args.dataset.rglob("*")
+        if path.is_file()
+        and path.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}
     )
     if not image_paths:
         raise FileNotFoundError(

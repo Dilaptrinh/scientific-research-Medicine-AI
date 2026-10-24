@@ -8,10 +8,16 @@ __pycache__/
 data/raw/*
 data/processed/*
 data/annotations/*
+data/pill_dataset/*
+data/pill_queries/*
+data/pill_index/*
 models/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/annotations/.gitkeep
+!data/pill_dataset/.gitkeep
+!data/pill_queries/.gitkeep
+!data/pill_index/.gitkeep
 !models/.gitkeep
 !models/yolo/
 !models/yolo/.gitkeep
