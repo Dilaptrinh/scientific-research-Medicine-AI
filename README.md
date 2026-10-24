@@ -176,6 +176,8 @@ Phụ trách thu thập ảnh, gán bounding box, train YOLO, inference và crop
 notebooks/train_pill_embedding_colab.py
 app/services/pill_embedding.py
 app/services/retrieval.py
+scripts/build_pill_index.py
+scripts/search_pill.py
 tests/test_retrieval.py
 data/pill_dataset/
 data/pill_queries/
@@ -186,6 +188,19 @@ Phụ trách train embedding model cho ảnh viên, xây FAISS index và ánh x�
 tới metadata thuốc. `PillReference` là metadata tối thiểu cho mỗi ảnh mẫu;
 thông tin hoạt chất, hàm lượng và nguồn chính thức sẽ bổ sung theo
 `medicine_id`, không ghi trực tiếp vào FAISS.
+
+Có thể test ngay bằng MobileNetV3 pretrained, chưa cần checkpoint đã fine-tune:
+
+```powershell
+pip install -e ".[ml,retrieval,dev]"
+python scripts/build_pill_index.py
+python scripts/search_pill.py data/pill_queries/query.jpg
+```
+
+`build_pill_index.py` đọc ảnh từ `data/pill_dataset/<medicine_id>/`, tự tạo
+metadata tối thiểu từ tên folder và ghi index vào `data/pill_index/`. Lần chạy
+đầu MobileNetV3 pretrained có thể cần Internet để tải weights. Khi đã fine-tune
+embedding model, truyền checkpoint bằng `--checkpoint`.
 
 ### Các bước tiếp theo
 

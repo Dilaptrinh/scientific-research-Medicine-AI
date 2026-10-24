@@ -6,7 +6,7 @@ import numpy as np
 
 @dataclass(frozen=True)
 class PillEmbeddingConfig:
-    checkpoint_path: Path
+    checkpoint_path: Path | None = None
     image_size: int = 224
 
 
@@ -23,22 +23,30 @@ class MobileNetPillEmbedder:
                 'Install them with: pip install -e ".[ml]"'
             ) from error
 
-        if not config.checkpoint_path.is_file():
-            raise FileNotFoundError(
-                f"Embedding checkpoint was not found: {config.checkpoint_path}"
-            )
-
-        checkpoint = torch.load(
-            config.checkpoint_path,
-            map_location="cpu",
-            weights_only=False,
-        )
-        embedding_dim = int(checkpoint["embedding_dim"])
-
         from torchvision import models
 
-        backbone = models.mobilenet_v3_large(weights=None)
+        checkpoint = None
+        if config.checkpoint_path is not None:
+            if not config.checkpoint_path.is_file():
+                raise FileNotFoundError(
+                    f"Embedding checkpoint was not found: {config.checkpoint_path}"
+                )
+            checkpoint = torch.load(
+                config.checkpoint_path,
+                map_location="cpu",
+                weights_only=False,
+            )
+
+        weights = (
+            None
+            if checkpoint is not None
+            else models.MobileNet_V3_Large_Weights.DEFAULT
+        )
+        backbone = models.mobilenet_v3_large(weights=weights)
         feature_dim = backbone.classifier[0].in_features
+        embedding_dim = (
+            int(checkpoint["embedding_dim"]) if checkpoint is not None else feature_dim
+        )
         model = torch.nn.Module()
         model.features = backbone.features
         model.pool = torch.nn.AdaptiveAvgPool2d((1, 1))
@@ -54,7 +62,8 @@ class MobileNetPillEmbedder:
             return torch.nn.functional.normalize(model.projection(features), p=2, dim=1)
 
         model.forward = forward
-        model.load_state_dict(checkpoint["model_state_dict"])
+        if checkpoint is not None:
+            model.load_state_dict(checkpoint["model_state_dict"])
         model.eval()
 
         self._torch = torch
