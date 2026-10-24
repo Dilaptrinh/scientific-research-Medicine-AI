@@ -174,13 +174,18 @@ Phụ trách thu thập ảnh, gán bounding box, train YOLO, inference và crop
 
 ```text
 notebooks/train_pill_embedding_colab.py
+app/services/pill_embedding.py
+app/services/retrieval.py
+tests/test_retrieval.py
 data/pill_dataset/
 data/pill_queries/
 data/pill_index/
 ```
 
 Phụ trách train embedding model cho ảnh viên, xây FAISS index và ánh xạ kết quả
-tới metadata thuốc.
+tới metadata thuốc. `PillReference` là metadata tối thiểu cho mỗi ảnh mẫu;
+thông tin hoạt chất, hàm lượng và nguồn chính thức sẽ bổ sung theo
+`medicine_id`, không ghi trực tiếp vào FAISS.
 
 ### Các bước tiếp theo
 
