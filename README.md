@@ -110,6 +110,37 @@ Adapter nhận ảnh OpenCV dạng `numpy.ndarray`, chạy YOLO, lưu các crop 
 }
 ```
 
+### 3.1.1. Huấn luyện YOLO một lớp và báo cáo thực nghiệm
+
+Trong bài toán này, YOLO chỉ có một lớp `object` để tìm vùng hộp, vỉ hoặc
+viên thuốc. YOLO không phân loại ba loại này; bước phân loại crop là một module
+khác và không được đưa vào các chỉ số của detector.
+
+Tạo `data/yolo/data.yaml` với `names: [object]`, sau đó chạy:
+
+```powershell
+python scripts/train_yolo.py `
+  --data data/yolo/data.yaml `
+  --model yolov9s.pt `
+  --epochs 50 `
+  --imgsz 640 `
+  --batch 16 `
+  --seeds 0
+```
+
+Có thể chạy nhiều seed để báo cáo độ ổn định:
+
+```powershell
+python scripts/train_yolo.py --data data/yolo/data.yaml --seeds 0,1,2
+```
+
+Mỗi run sinh `metrics.json`, `metrics.csv`, `hyperparameters.csv`, trọng số
+`best.pt`, cùng các biểu đồ của Ultralytics trong `runs/yolo/`. Bảng metrics
+gồm mAP@50, mAP@75, mAP@[50:95], thời gian huấn luyện, thời gian suy luận
+trên ảnh, FPS và số tham số. `confusion_matrix.png` là ma trận của detector
+giữa `object` và `background`; ô `object → object` là dự đoán đúng, không phải
+ma trận phân loại `hop/vi/thuoc`.
+
 ## 3.2. Branch YOLO + MobileNet phân loại loại vật thể
 
 Branch triển khai phần này là:
