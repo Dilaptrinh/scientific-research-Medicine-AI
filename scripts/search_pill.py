@@ -2,12 +2,19 @@ import argparse
 from pathlib import Path
 
 import cv2
+import numpy as np
 
 from app.services.pill_embedding import (
     MobileNetPillEmbedder,
     PillEmbeddingConfig,
+    resolve_checkpoint_path,
 )
 from app.services.retrieval import FaissPillIndex
+
+
+def read_image(path: Path) -> np.ndarray | None:
+    data = np.fromfile(path, dtype=np.uint8)
+    return cv2.imdecode(data, cv2.IMREAD_COLOR)
 
 
 def main() -> None:
@@ -19,12 +26,13 @@ def main() -> None:
     parser.add_argument("--top-k", type=int, default=5)
     args = parser.parse_args()
 
-    image = cv2.imread(str(args.image))
+    image = read_image(args.image)
     if image is None:
         raise OSError(f"Could not read image: {args.image}")
 
+    resolved_checkpoint = resolve_checkpoint_path(args.checkpoint)
     embedder = MobileNetPillEmbedder(
-        PillEmbeddingConfig(checkpoint_path=args.checkpoint)
+        PillEmbeddingConfig(checkpoint_path=resolved_checkpoint)
     )
     index = FaissPillIndex.load(args.index, args.metadata)
     matches = index.search(embedder.embed(image), top_k=args.top_k)

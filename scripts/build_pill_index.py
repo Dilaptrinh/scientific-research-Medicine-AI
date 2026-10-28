@@ -7,8 +7,14 @@ import numpy as np
 from app.services.pill_embedding import (
     MobileNetPillEmbedder,
     PillEmbeddingConfig,
+    resolve_checkpoint_path,
 )
 from app.services.retrieval import FaissPillIndex, PillReference
+
+
+def read_image(path: Path) -> np.ndarray | None:
+    data = np.fromfile(path, dtype=np.uint8)
+    return cv2.imdecode(data, cv2.IMREAD_COLOR)
 
 
 def build_index(
@@ -29,13 +35,14 @@ def build_index(
         )
 
     if embedder is None:
+        resolved_checkpoint = resolve_checkpoint_path(checkpoint)
         embedder = MobileNetPillEmbedder(
-            PillEmbeddingConfig(checkpoint_path=checkpoint)
+            PillEmbeddingConfig(checkpoint_path=resolved_checkpoint)
         )
     embeddings = []
     references = []
     for image_path in image_paths:
-        image = cv2.imread(str(image_path))
+        image = read_image(image_path)
         if image is None:
             raise OSError(f"Could not read image: {image_path}")
         embeddings.append(embedder.embed(image))

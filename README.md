@@ -206,11 +206,34 @@ python scripts/run_pill_search.py "https://example.com/pill.jpg"
 python scripts/run_pill_search.py "data/pill_queries/query.jpg"
 ```
 
+Để đánh giá độ chính xác, đặt ảnh chưa dùng để train theo cấu trúc:
+
+```text
+data/pill_queries/
+├── Vien_DauBaoTu_Glomoti-M_013/
+│   ├── test_01.jpg
+│   └── test_02.jpg
+└── Vien_DauBaoTu_Kremil-S_014/
+    └── test_01.jpg
+```
+
+Tên thư mục phải trùng với `medicine_id` trong dataset. Chạy:
+
+```powershell
+python scripts/evaluate_pill_retrieval.py --queries data/pill_queries
+```
+
+Script sẽ in kết quả từng ảnh và tổng hợp Top-1, Top-3. Các ảnh đánh giá phải
+được chụp hoặc tách riêng khỏi ảnh dùng để xây FAISS index; nếu dùng lại ảnh
+trong `data/pill_dataset/`, kết quả sẽ bị lạc quan giả tạo.
+
 `build_pill_index.py` đọc đệ quy ảnh từ `data/pill_dataset/<medicine_id>/`
 (hoặc `data/pill_dataset/VIEN/<medicine_id>/`), tự tạo
-metadata tối thiểu từ tên folder và ghi index vào `data/pill_index/`. Lần chạy
-đầu MobileNetV3 pretrained có thể cần Internet để tải weights. Khi đã fine-tune
-embedding model, truyền checkpoint bằng `--checkpoint`.
+metadata tối thiểu từ tên folder và ghi index vào `data/pill_index/`. Nếu bạn đặt
+checkpoint local ở `models/mobilenet/pill_mobilenet_embedding.pt`, script sẽ tự
+load file đó mà không cần `--checkpoint`. Lần chạy đầu MobileNetV3 pretrained có
+thể cần Internet để tải weights. Khi đã fine-tune embedding model, bạn vẫn có
+thể truyền checkpoint bằng `--checkpoint` để override.
 
 ### Các bước tiếp theo
 

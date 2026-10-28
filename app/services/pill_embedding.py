@@ -4,6 +4,21 @@ from pathlib import Path
 import numpy as np
 
 
+def resolve_checkpoint_path(checkpoint: Path | str | None = None) -> Path | None:
+    """Return a user-provided checkpoint or the repo-local MobileNet checkpoint."""
+    if checkpoint is not None:
+        return Path(checkpoint)
+
+    project_root = Path(__file__).resolve().parents[2]
+    for candidate in (
+        project_root / "models" / "mobilenet" / "pill_mobilenet_embedding.pt",
+        project_root / "models" / "mobilenet" / "pill_mobilenet_embedding.pth",
+    ):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 @dataclass(frozen=True)
 class PillEmbeddingConfig:
     checkpoint_path: Path | None = None
@@ -50,12 +65,22 @@ class MobileNetPillEmbedder:
         model = torch.nn.Module()
         model.features = backbone.features
         model.pool = torch.nn.AdaptiveAvgPool2d((1, 1))
-        model.projection = torch.nn.Sequential(
-            torch.nn.Linear(feature_dim, 512),
-            torch.nn.Hardswish(),
-            torch.nn.Dropout(p=0.2),
-            torch.nn.Linear(512, embedding_dim),
+        checkpoint_keys = (
+            set(checkpoint["model_state_dict"]) if checkpoint is not None else set()
         )
+        projection_layers = [
+            torch.nn.Linear(feature_dim, 512),
+        ]
+        if "projection.1.running_mean" in checkpoint_keys:
+            projection_layers.append(torch.nn.BatchNorm1d(512))
+        projection_layers.extend(
+            [
+                torch.nn.Hardswish(),
+                torch.nn.Dropout(p=0.2),
+                torch.nn.Linear(512, embedding_dim),
+            ]
+        )
+        model.projection = torch.nn.Sequential(*projection_layers)
 
         def forward(images: torch.Tensor) -> torch.Tensor:
             features = model.pool(model.features(images)).flatten(1)
@@ -71,7 +96,16 @@ class MobileNetPillEmbedder:
         self._transform = transforms.Compose(
             [
                 transforms.ToPILImage(),
-                transforms.Resize((config.image_size, config.image_size)),
+                transforms.Resize(
+                    (
+                        int(checkpoint.get("image_size", config.image_size))
+                        if checkpoint is not None
+                        else config.image_size,
+                        int(checkpoint.get("image_size", config.image_size))
+                        if checkpoint is not None
+                        else config.image_size,
+                    )
+                ),
                 transforms.ToTensor(),
                 transforms.Normalize(
                     mean=[0.485, 0.456, 0.406],

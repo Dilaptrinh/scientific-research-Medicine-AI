@@ -37,6 +37,10 @@ class FaissPillIndex:
         self._index = faiss.IndexFlatIP(dimension)
         self._references: list[PillReference] = []
 
+    @property
+    def dimension(self) -> int:
+        return self._index.d
+
     def add(
         self,
         embeddings: np.ndarray,
