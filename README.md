@@ -137,7 +137,9 @@ python scripts/train_yolo.py --data data/yolo/data.yaml --seeds 0,1,2
 Mỗi run sinh `metrics.json`, `metrics.csv`, `hyperparameters.csv`, trọng số
 `best.pt`, cùng các biểu đồ của Ultralytics trong `runs/yolo/`. Bảng metrics
 gồm mAP@50, mAP@75, mAP@[50:95], thời gian huấn luyện, thời gian suy luận
-trên ảnh, FPS và số tham số. `confusion_matrix.png` là ma trận của detector
+trên ảnh, FPS và số tham số. Khi chạy nhiều seed, `summary_statistics.csv`
+thêm trung bình và độ lệch chuẩn cho các chỉ số này. `confusion_matrix.png`
+là ma trận của detector
 giữa `object` và `background`; ô `object → object` là dự đoán đúng, không phải
 ma trận phân loại `hop/vi/thuoc`.
 

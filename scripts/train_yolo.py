@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import statistics
 import time
 from pathlib import Path
 from typing import Any
@@ -75,6 +76,33 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer = csv.DictWriter(file, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
+
+
+def summarize_runs(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    fields = (
+        "mAP50",
+        "mAP75",
+        "mAP50-95",
+        "training_minutes",
+        "inference_ms_per_image",
+        "inference_images_per_second",
+        "parameters_million",
+    )
+    summary = []
+    for field in fields:
+        values = [float(row[field]) for row in rows if row[field] is not None]
+        if not values:
+            continue
+        summary.append(
+            {
+                "metric": field,
+                "mean": round(statistics.mean(values), 6),
+                "std": round(statistics.stdev(values), 6)
+                if len(values) > 1
+                else 0.0,
+            }
+        )
+    return summary
 
 
 def validate_one_class(names: Any, expected_name: str) -> None:
@@ -191,6 +219,7 @@ def main() -> None:
         print(json.dumps(row, indent=2))
 
     write_csv(args.project / "summary_metrics.csv", run_rows)
+    write_csv(args.project / "summary_statistics.csv", summarize_runs(run_rows))
     write_csv(args.project / "hyperparameters.csv", hyperparameter_rows)
 
 
