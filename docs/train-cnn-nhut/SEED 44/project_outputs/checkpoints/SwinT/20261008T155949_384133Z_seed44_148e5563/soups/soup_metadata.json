@@ -1,0 +1,40 @@
+[
+  {
+    "model_name": "SwinT",
+    "run_id": "20261008T155949_384133Z_seed44_148e5563",
+    "soup_type": "uniform",
+    "checkpoint_path": "/content/drive/MyDrive/project_outputs/checkpoints/SwinT/20261008T155949_384133Z_seed44_148e5563/soups/uniform_soup.pt",
+    "source_checkpoints": [
+      "/content/drive/MyDrive/project_outputs/checkpoints/SwinT/20261008T155949_384133Z_seed44_148e5563/epoch_014.pt",
+      "/content/drive/MyDrive/project_outputs/checkpoints/SwinT/20261008T155949_384133Z_seed44_148e5563/epoch_015.pt",
+      "/content/drive/MyDrive/project_outputs/checkpoints/SwinT/20261008T155949_384133Z_seed44_148e5563/epoch_013.pt",
+      "/content/drive/MyDrive/project_outputs/checkpoints/SwinT/20261008T155949_384133Z_seed44_148e5563/epoch_011.pt",
+      "/content/drive/MyDrive/project_outputs/checkpoints/SwinT/20261008T155949_384133Z_seed44_148e5563/epoch_010.pt"
+    ],
+    "number_of_checkpoints": 5,
+    "validation_loss": 0.34688002049033323,
+    "validation_accuracy": 0.9975124378109452,
+    "validation_f1": 0.9975010658460707,
+    "construction_time_seconds": 36.15013153300015,
+    "split_fingerprint": "0f8401472269802c4a436e61a8e36e4d21c6d2fb431493274232abb1be82a5b3"
+  },
+  {
+    "model_name": "SwinT",
+    "run_id": "20261008T155949_384133Z_seed44_148e5563",
+    "soup_type": "greedy",
+    "checkpoint_path": "/content/drive/MyDrive/project_outputs/checkpoints/SwinT/20261008T155949_384133Z_seed44_148e5563/soups/greedy_soup.pt",
+    "source_checkpoints": [
+      "/content/drive/MyDrive/project_outputs/checkpoints/SwinT/20261008T155949_384133Z_seed44_148e5563/epoch_014.pt",
+      "/content/drive/MyDrive/project_outputs/checkpoints/SwinT/20261008T155949_384133Z_seed44_148e5563/epoch_015.pt",
+      "/content/drive/MyDrive/project_outputs/checkpoints/SwinT/20261008T155949_384133Z_seed44_148e5563/epoch_013.pt",
+      "/content/drive/MyDrive/project_outputs/checkpoints/SwinT/20261008T155949_384133Z_seed44_148e5563/epoch_011.pt",
+      "/content/drive/MyDrive/project_outputs/checkpoints/SwinT/20261008T155949_384133Z_seed44_148e5563/epoch_010.pt"
+    ],
+    "number_of_checkpoints": 5,
+    "validation_loss": 0.34687911070401395,
+    "validation_accuracy": 0.9975124378109452,
+    "validation_f1": 0.9975010658460707,
+    "construction_time_seconds": 36.15013153300015,
+    "split_fingerprint": "0f8401472269802c4a436e61a8e36e4d21c6d2fb431493274232abb1be82a5b3"
+  }
+]

@@ -1,0 +1,33 @@
+{
+  "HOP": {
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1-score": 1.0,
+    "support": 116.0
+  },
+  "VI": {
+    "precision": 1.0,
+    "recall": 0.9263157894736842,
+    "f1-score": 0.9617486338797814,
+    "support": 95.0
+  },
+  "VIEN": {
+    "precision": 0.9646464646464646,
+    "recall": 1.0,
+    "f1-score": 0.9820051413881749,
+    "support": 191.0
+  },
+  "accuracy": 0.9825870646766169,
+  "macro avg": {
+    "precision": 0.9882154882154882,
+    "recall": 0.9754385964912281,
+    "f1-score": 0.981251258422652,
+    "support": 402.0
+  },
+  "weighted avg": {
+    "precision": 0.9832026735011808,
+    "recall": 0.9825870646766169,
+    "f1-score": 0.9824107020490563,
+    "support": 402.0
+  }
+}
