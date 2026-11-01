@@ -120,7 +120,8 @@ app/
     prediction.py      # Format input/output chuẩn
   services/
     detection.py       # Adapter YOLO và lưu crop
-    retrieval.py       # Sẽ chứa adapter FAISS
+    pill_embedding.py   # Encoder few-shot cho ảnh viên thuốc
+    retrieval.py       # Adapter FAISS và metadata nguồn
     vlm.py             # Sẽ chứa adapter VLM
   main.py              # Khởi tạo FastAPI
 
@@ -153,7 +154,8 @@ YOLO nhận ảnh gốc và trả các detection/crop:
 }
 ```
 
-Embedding model nhận ảnh viên thuốc và trả vector. FAISS nhận vector đó và trả
+Các script đọc ảnh bằng OpenCV, vì vậy embedding model nhận ảnh màu dạng
+`numpy.ndarray` theo thứ tự kênh BGR và trả vector chuẩn hóa. FAISS nhận vector đó và trả
 các kết quả gần nhất kèm metadata. VLM
 chỉ tổng hợp từ ảnh và các kết quả có nguồn, không tự thay thế dữ liệu model.
 
@@ -235,12 +237,106 @@ load file đó mà không cần `--checkpoint`. Lần chạy đầu MobileNetV3 
 thể cần Internet để tải weights. Khi đã fine-tune embedding model, bạn vẫn có
 thể truyền checkpoint bằng `--checkpoint` để override.
 
-### Các bước tiếp theo
+### RAG ảnh trên crop đã có (`feature/few-shot-rag-img`)
 
-1. Hoàn thiện dataset và YOLO.
-2. Train embedding model cho ảnh viên.
-3. Xây FAISS index và metadata.
-4. Thêm VLM sau khi retrieval đã trả metadata đáng tin cậy.
+Luồng RAG không phụ thuộc YOLO: nhận một ảnh crop, tạo embedding, tìm các ảnh
+gần nhất bằng FAISS, gom các ảnh theo `medicine_id`, áp dụng ngưỡng tin cậy và
+tra cứu knowledge base.
+
+Branch này chỉ xử lý ảnh viên thuốc đã được crop sẵn. YOLO vẫn là một pipeline
+độc lập và không được gọi bởi CLI hoặc API RAG crop-only.
+
+Index hiện có được xây từ:
+
+```powershell
+python scripts/build_pill_index.py `
+  --dataset data/pill_dataset/VIEN `
+  --output data/pill_index
+```
+
+Tạo knowledge base template từ 47 thuốc trong metadata:
+
+```powershell
+python scripts/build_medicine_knowledge_template.py
+```
+
+Có thể nhập bệnh và nguồn từ file Excel thống kê thuốc:
+
+```powershell
+python scripts/import_medicine_knowledge_xlsx.py `
+  "D:\Dowloads\CentOS\Thống kê thuốc.xlsx"
+```
+
+File `data/medicine_knowledge/medicines.json` hiện có 47 thuốc, 47 bệnh,
+47 URL và 9 mô tả nguồn từ Excel. Thông tin web đã được bổ sung cho 36 thuốc:
+36 hoạt chất, 32 hàm lượng và 32 cảnh báo. Một số trường vẫn để trống khi
+trang nguồn không nêu rõ; không suy đoán các trường này.
+
+Chạy RAG cho một crop đã được YOLO cắt:
+
+```powershell
+python scripts/search_pill_rag.py data/processed/crop_001.jpg
+```
+
+Mỗi ảnh query được trả về danh sách thuốc Top-k khác nhau. `--top-k` điều khiển
+số candidate, còn `--threshold` điều khiển việc trả `match` hay `unknown`:
+
+```powershell
+python scripts/search_pill_rag.py `
+  "data/pill_queries/Vien_Gout_Coxileb200_034/Coxileb.png" `
+  --top-k 3 --threshold 0.75
+```
+
+Mặc định similarity dưới `0.75` trả trạng thái `unknown`. Ngưỡng này chỉ là
+giá trị ban đầu và cần điều chỉnh bằng tập query độc lập:
+
+```powershell
+python scripts/search_pill_rag.py data/processed/crop_001.jpg `
+  --threshold 0.80 --top-k 5
+```
+
+API crop-only là `POST /api/v1/rag/predict`; endpoint này không chạy YOLO:
+
+```powershell
+curl.exe -X POST http://127.0.0.1:8000/api/v1/rag/predict `
+  -F "image=@data/processed/crop_001.jpg"
+```
+
+Response gồm `status`, `answer`, danh sách candidate đã gom theo thuốc,
+similarity cao nhất, similarity trung bình, số ảnh mẫu khớp và nguồn.
+
+Để đo accuracy, mỗi ảnh phải nằm trong thư mục mang đúng `medicine_id`; tên
+file ảnh không được dùng làm nhãn:
+
+```text
+data/pill_queries/
+├── Vien_Gout_Coxileb200_034/
+│   └── Coxileb.png
+└── Vien_DauRang_HapacolCaplet500_026/
+    └── Hapacol.png
+```
+
+Chạy đánh giá:
+
+```powershell
+python scripts/evaluate_pill_retrieval.py `
+  --queries data/pill_queries `
+  --top-k 3
+```
+
+`Top-1` kiểm tra thuốc đúng có đứng đầu hay không; `Top-3` kiểm tra thuốc đúng
+có nằm trong ba thuốc khác nhau đầu tiên hay không. Ảnh đặt trực tiếp ngay dưới
+`data/pill_queries/` sẽ bị từ chối vì không có nhãn ground truth.
+
+### Các bước còn cần dữ liệu
+
+1. Tách query khỏi ảnh dùng build index và chạy đánh giá Top-1/Top-3.
+2. Điền thông tin y khoa và nguồn chính thức cho từng `medicine_id`.
+3. Chọn threshold dựa trên validation set, không dùng mặc định 0.75 như
+   một kết luận độ tin cậy.
+
+VLM/LLM chưa cần ở giai đoạn này: template answer hiện tại đã trả kết quả
+retrieval có nguồn và cảnh báo, tránh để model tự đoán thông tin thuốc.
 
 ## 7. Quy trình Git và Pull Request
 

@@ -1,10 +1,18 @@
 import numpy as np
 import pytest
 
+from app.services.pill_embedding import MobileNetPillEmbedder
 from app.services.retrieval import FaissPillIndex, PillReference
 
 
 faiss = pytest.importorskip("faiss")
+
+
+def test_embed_rejects_non_color_images() -> None:
+    embedder = object.__new__(MobileNetPillEmbedder)
+
+    with pytest.raises(ValueError, match="color image"):
+        embedder.embed(np.zeros((16, 16), dtype=np.uint8))
 
 
 def test_faiss_returns_closest_pill_and_persists_metadata(tmp_path) -> None:

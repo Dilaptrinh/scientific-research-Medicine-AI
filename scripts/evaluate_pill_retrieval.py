@@ -24,6 +24,9 @@ def read_image(path: Path) -> np.ndarray | None:
 
 
 def collect_queries(query_directory: Path) -> list[tuple[Path, str]]:
+    if not query_directory.is_dir():
+        raise FileNotFoundError(f"Query directory was not found: {query_directory}")
+
     queries = [
         (path, path.parent.name)
         for path in sorted(query_directory.rglob("*"))
@@ -32,6 +35,13 @@ def collect_queries(query_directory: Path) -> list[tuple[Path, str]]:
     if not queries:
         raise FileNotFoundError(
             f"No query images found in labelled subfolders: {query_directory}"
+        )
+    unlabelled = [path for path, expected_id in queries if expected_id == query_directory.name]
+    if unlabelled:
+        examples = ", ".join(str(path) for path in unlabelled[:3])
+        raise ValueError(
+            "Each query image must be inside a subfolder named with its "
+            f"medicine_id. Move these images into labelled folders: {examples}"
         )
     return queries
 
@@ -80,8 +90,17 @@ def main() -> None:
         if image is None:
             raise OSError(f"Could not read query image: {query_path}")
 
-        matches = index.search(embedder.embed(image), top_k=args.top_k)
-        predicted_ids = [match.reference.medicine_id for match in matches]
+        matches = index.search(
+            embedder.embed(image),
+            top_k=max(args.top_k * 10, args.top_k),
+        )
+        predicted_ids = []
+        for match in matches:
+            medicine_id = match.reference.medicine_id
+            if medicine_id not in predicted_ids:
+                predicted_ids.append(medicine_id)
+            if len(predicted_ids) == args.top_k:
+                break
         if not predicted_ids:
             skipped += 1
             print(f"SKIP {query_path}: no matches")

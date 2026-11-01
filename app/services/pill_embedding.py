@@ -26,7 +26,11 @@ class PillEmbeddingConfig:
 
 
 class MobileNetPillEmbedder:
-    """Load the trained MobileNet encoder and create normalized pill vectors."""
+    """Load the trained MobileNet encoder and create normalized pill vectors.
+
+    Images are expected in OpenCV's BGR channel order, as returned by
+    ``cv2.imdecode``. They are converted to RGB before torchvision preprocessing.
+    """
 
     def __init__(self, config: PillEmbeddingConfig) -> None:
         try:
@@ -116,10 +120,16 @@ class MobileNetPillEmbedder:
         self.embedding_dim = embedding_dim
 
     def embed(self, image: np.ndarray) -> np.ndarray:
+        if image.ndim != 3 or image.shape[2] != 3:
+            raise ValueError(
+                f"Expected a color image with shape (height, width, 3), "
+                f"got {image.shape}."
+            )
         if image.size == 0:
             raise ValueError("Cannot embed an empty pill image.")
 
-        tensor = self._transform(image).unsqueeze(0)
+        rgb_image = image[:, :, ::-1].copy()
+        tensor = self._transform(rgb_image).unsqueeze(0)
         with self._torch.no_grad():
             embedding = self._model(tensor).cpu().numpy()[0]
         return np.asarray(embedding, dtype=np.float32)
