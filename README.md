@@ -137,8 +137,8 @@ ma trận phân loại `hop/vi/thuoc`.
 ## 3.2. Endpoint YOLO-only
 
 Branch `feature/yolo` chỉ làm detection và crop, không nạp MobileNet/CNN.
-Endpoint `POST /api/v1/predict` nhận một ảnh, tìm từng object bằng
-`models/yolo/best.pt`, lưu crop vào `data/processed/` và trả:
+Script terminal nhận một ảnh, tìm từng object bằng `models/yolo/best.pt`,
+lưu crop vào `data/processed/` và in kết quả:
 
 ```json
 {
@@ -158,18 +158,10 @@ Endpoint `POST /api/v1/predict` nhận một ảnh, tìm từng object bằng
 
 ```text
 app/
-  api/
-    routes.py          # Nhận request và trả response HTTP
-  core/                # Cấu hình, logging và hạ tầng dùng chung
   schemas/
-    prediction.py      # Format input/output chuẩn
+    prediction.py      # Format kết quả detection
   services/
-    pipeline.py        # Interface điều phối pipeline
-    detection.py       # Sẽ chứa adapter YOLO
-    classification.py  # Sẽ chứa adapter MobileNet
-    retrieval.py       # Sẽ chứa adapter FAISS
-    vlm.py             # Sẽ chứa adapter VLM
-  main.py              # Khởi tạo FastAPI
+    detection.py       # Adapter YOLO
 
 data/
   raw/                 # Ảnh gốc; không commit ảnh thật
@@ -222,12 +214,10 @@ app/services/detection.py
 
 Phụ trách thu thập ảnh, gán bounding box, train YOLO, inference và crop.
 
-### Nhánh MobileNet/API
+### Nhánh terminal YOLO
 
 ```text
-app/services/classification.py
-app/services/pipeline.py
-app/api/routes.py
+scripts/predict_yolo.py
 tests/
 ```
 
