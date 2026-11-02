@@ -12,10 +12,10 @@ def test_health() -> None:
     assert response.json() == {"status": "ok"}
 
 
-def test_predict_is_explicitly_unimplemented() -> None:
+def test_predict_rejects_invalid_image() -> None:
     response = client.post(
         "/api/v1/predict",
         files={"image": ("medicines.jpg", b"not-an-image", "image/jpeg")},
     )
 
-    assert response.status_code == 501
+    assert response.status_code == 400
