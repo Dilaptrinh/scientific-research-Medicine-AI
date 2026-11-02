@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import cv2
 
-from app.services.detection import YoloDetector
+from yolo_detector import YoloDetector
 
 
 def parse_args() -> argparse.Namespace:

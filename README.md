@@ -33,14 +33,14 @@ cd D:\My_File\code\NCKH
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-pip install -e ".[dev]"
+pip install -e ".[ml]"
 ```
 
 Nếu PowerShell chặn activate script, chỉ cần chạy Python trực tiếp trong
 virtual environment:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m pip install -e ".[ml]"
 ```
 
 ## 3. Chạy YOLO bằng terminal
@@ -64,7 +64,7 @@ Kết quả JSON được in trực tiếp trên terminal. Các crop được l�
 ## 3.1. Đưa model YOLO hiện có vào project
 
 Code adapter YOLO nằm tại
-[`app/services/detection.py`](./app/services/detection.py). Model weights không
+[`scripts/yolo_detector.py`](./scripts/yolo_detector.py). Model weights không
 được commit vào Git. Hãy tạo thư mục `models/yolo/` và copy file:
 
 ```text
@@ -80,7 +80,7 @@ models/yolo/best.pt
 Cài thêm dependency cho YOLO:
 
 ```powershell
-pip install -e ".[ml,dev]"
+pip install -e ".[ml]"
 ```
 
 Adapter nhận ảnh OpenCV dạng `numpy.ndarray`, chạy YOLO, lưu các crop vào
@@ -151,16 +151,13 @@ lưu crop vào `data/processed/` và in kết quả:
 ## 4. Cấu trúc thư mục
 
 ```text
-app/
-  services/
-    detection.py       # Adapter YOLO
+scripts/
+  predict_yolo.py      # Chạy inference từ terminal
+  yolo_detector.py     # Adapter YOLO
+  train_yolo.py        # Train/evaluate
 
-data/
-  raw/                 # Ảnh gốc; không commit ảnh thật
-  processed/           # Ảnh crop và kết quả tiền xử lý
-  annotations/         # Nhãn YOLO và metadata
-
-models/                # Weights/index; không commit file lớn
+data/processed/        # Crop sinh ra khi inference
+models/yolo/best.pt    # Checkpoint của branch YOLO
 pyproject.toml         # Dependency của project
 ```
 

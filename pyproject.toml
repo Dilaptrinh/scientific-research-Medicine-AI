@@ -18,5 +18,3 @@ ml = [
     "torchvision>=0.18,<1.0",
     "ultralytics>=8.3,<9.0",
 ]
-[tool.setuptools.packages.find]
-include = ["app*"]
