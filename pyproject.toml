@@ -21,6 +21,7 @@ ml = [
     "torch>=2.3,<3.0",
     "torchvision>=0.18,<1.0",
     "ultralytics>=8.3,<9.0",
+    "rapidocr-onnxruntime>=1.4,<2.0",
 ]
 retrieval = [
     "faiss-cpu>=1.8,<2.0",

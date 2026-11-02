@@ -553,6 +553,20 @@ top-3 ứng viên Image RAG. Graph RAG chỉ dùng quan hệ hỗ trợ có tron
 `support.csv` chưa có dữ liệu xung đột thuốc, nên hệ thống cảnh báo khi không
 tìm thấy quan hệ thay vì tự khẳng định hai thuốc xung đột.
 
+Pipeline đầy đủ theo loại vật thể dùng `POST /api/v1/medicine-pipeline`:
+
+```text
+ảnh → YOLO từng object → crop → CNN hop/vi/vien
+     → hop/vi: OCR tên thuốc
+     → vien: Image RAG top-3
+     → Graph RAG tổ hợp thuốc → Text RAG từng thuốc
+```
+
+Pipeline này cần checkpoint CNN 3 lớp tại
+`models/mobilenet/type_classifier.pth` và OCR `rapidocr-onnxruntime`.
+Hai checkpoint MobileNet hiện có không phải model phân loại `hop/vi/vien`,
+nên không được dùng thay thế. Kết quả luôn ghi là dự đoán, không khẳng định.
+
 Gemini vẫn là thành phần online tùy chọn để diễn đạt câu trả lời. Cấu hình nằm
 trong file `.env` ở thư mục gốc (file này đã được Git bỏ qua), không cần dán biến
 môi trường mỗi lần:

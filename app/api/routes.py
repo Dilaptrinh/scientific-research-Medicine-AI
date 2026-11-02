@@ -436,3 +436,85 @@ async def local_rag_chat(
         ],
         graph_warnings=graph_warnings,
     )
+
+
+@router.post("/medicine-pipeline", response_model=FullRagResponse)
+async def medicine_pipeline(
+    question: str = Form(...),
+    image: UploadFile = File(...),
+) -> FullRagResponse:
+    """YOLO -> type CNN -> OCR/Image RAG -> Graph RAG -> Text RAG."""
+    import cv2
+    import numpy as np
+
+    content = await image.read()
+    decoded = cv2.imdecode(np.frombuffer(content, np.uint8), cv2.IMREAD_COLOR)
+    if decoded is None:
+        raise HTTPException(status_code=400, detail="Uploaded file is not a valid image.")
+    try:
+        from app.services.medicine_pipeline import MedicinePipeline
+
+        root = Path(__file__).resolve().parents[2]
+        objects = MedicinePipeline.from_root(root).run(decoded, uuid4().hex)
+        names: list[str] = []
+        lines: list[str] = []
+        predictions: list[dict[str, object]] = []
+        for index, item in enumerate(objects, 1):
+            classification = item.detection.classification
+            if classification is None:
+                continue
+            if classification.label in {"hop", "vi"}:
+                name = classification.ocr_text or "chưa đọc được tên thuốc"
+                lines.append(
+                    f"Đối tượng {index} ({classification.label}) - OCR dự đoán: {name}"
+                )
+                predictions.append({
+                    "object": index,
+                    "type": classification.label,
+                    "ocr_text": classification.ocr_text,
+                    "confidence": classification.confidence,
+                })
+            else:
+                candidates = item.image_rag.candidates if item.image_rag else ()
+                name = candidates[0].medicine_name if candidates else "chưa xác định"
+                lines.append(
+                    f"Đối tượng {index} (vien) - Image RAG dự đoán: {name}; "
+                    f"top-3: {', '.join(candidate.medicine_name for candidate in candidates)}"
+                )
+                predictions.append({
+                    "object": index,
+                    "type": classification.label,
+                    "medicine_name": name,
+                    "top_k": [
+                        {"medicine_name": c.medicine_name, "similarity": c.similarity}
+                        for c in candidates
+                    ],
+                    "confidence": classification.confidence,
+                })
+            if name != "chưa xác định" and name != "chưa đọc được tên thuốc":
+                names.append(name)
+
+        graph = _graph_rag_context(", ".join(names))
+        text_sections = []
+        for name in names:
+            text_answer, _, _ = _text_rag_service().answer(question, name)
+            text_sections.append(f"{name}:\n{text_answer}")
+        answer = (
+            "KẾT QUẢ DỰ ĐOÁN (không khẳng định)\n"
+            + "\n".join(lines)
+            + "\n\nGRAPH RAG:\n"
+            + graph
+            + "\n\nTEXT RAG - từng thuốc:\n"
+            + "\n\n".join(text_sections)
+        )
+    except (FileNotFoundError, ValueError, RuntimeError) as error:
+        logger.warning("Medicine pipeline failed: %s", error)
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    return FullRagResponse(
+        answer=answer,
+        medicine_name=names[0] if names else None,
+        source=None,
+        image_status="match" if names else "unknown",
+        image_similarity=None,
+        predictions=predictions,
+    )
