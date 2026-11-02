@@ -43,37 +43,29 @@ virtual environment:
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 ```
 
-## 3. Chạy và kiểm tra skeleton
+## 3. Chạy YOLO bằng terminal
+
+Chạy detection trên một ảnh:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\predict_yolo.py "D:\path\to\image.jpg"
+```
+
+Kết quả JSON được in trực tiếp trên terminal. Các crop được lưu vào
+`data/processed/`. Có thể chỉnh ngưỡng confidence:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\predict_yolo.py `
+  "D:\path\to\image.jpg" `
+  --confidence 0.4 `
+  --output data\processed
+```
 
 Chạy test:
 
 ```powershell
-pytest
+.\.venv\Scripts\python.exe -m pytest
 ```
-
-Khởi động API:
-
-```powershell
-uvicorn app.main:app --reload
-```
-
-Mở tài liệu API tại <http://127.0.0.1:8000/docs>.
-
-Kiểm tra server:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/api/v1/health
-```
-
-Kết quả:
-
-```json
-{"status": "ok"}
-```
-
-Ở skeleton ban đầu, endpoint dự đoán trả `501 Not Implemented` vì chưa tích hợp
-model thật. Branch tích hợp bên dưới chuyển endpoint sang pipeline thật, nhưng
-chỉ chạy được sau khi có đủ hai weights tương thích.
 
 ## 3.1. Đưa model YOLO hiện có vào project
 
