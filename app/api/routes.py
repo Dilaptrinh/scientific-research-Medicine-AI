@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from app import config
-from app.web import chat_page
+from app.web import chat_page, local_chat_page
 
 from app.schemas.rag import (
     FullRagResponse,
@@ -28,6 +28,11 @@ MAX_GEMINI_IMAGE_BYTES = 10 * 1024 * 1024
 @router.get("/chat", include_in_schema=False)
 def chat() -> object:
     return chat_page()
+
+
+@router.get("/local-chat", include_in_schema=False)
+def local_chat() -> object:
+    return local_chat_page()
 
 
 def _text_rag_service():
@@ -279,3 +284,75 @@ async def rag_chat(
         logger.warning("Local RAG chat failed: %s", error)
         raise HTTPException(status_code=503, detail=str(error)) from error
     return GeminiVisionResponse(answer=answer, model=service.model)
+
+
+@router.post("/local-rag-chat", response_model=FullRagResponse)
+async def local_rag_chat(
+    question: str = Form(...),
+    image: UploadFile = File(...),
+) -> FullRagResponse:
+    """Run YOLO, Image RAG, and Text RAG without an LLM."""
+    import cv2
+    import numpy as np
+
+    content = await image.read()
+    decoded = cv2.imdecode(np.frombuffer(content, np.uint8), cv2.IMREAD_COLOR)
+    if decoded is None:
+        raise HTTPException(status_code=400, detail="Uploaded file is not a valid image.")
+    try:
+        from app.services.detection import YoloDetector
+        from app.services.pill_rag import PillRagService
+
+        root = Path(__file__).resolve().parents[2]
+        detections = YoloDetector(
+            Path(os.getenv("YOLO_MODEL_PATH", root / "models" / "yolo" / "best.pt"))
+        ).detect(decoded, uuid4().hex)
+        if not detections:
+            raise RuntimeError("YOLO không phát hiện được viên thuốc trong ảnh.")
+
+        image_rag = PillRagService.from_paths(
+            index_path=root / "data" / "pill_index" / "pills.index",
+            metadata_path=root / "data" / "pill_index" / "pills.json",
+            knowledge_path=root / "data" / "medicine_knowledge" / "medicines.json",
+        )
+        best_result = None
+        for detection in detections:
+            crop = cv2.imread(detection.crop_path or "")
+            if crop is None:
+                continue
+            result = image_rag.search(crop)
+            if best_result is None or (
+                result.candidates
+                and (
+                    not best_result.candidates
+                    or result.candidates[0].similarity
+                    > best_result.candidates[0].similarity
+                )
+            ):
+                best_result = result
+        if best_result is None:
+            raise RuntimeError("Image RAG không đọc được vùng thuốc do YOLO tạo ra.")
+
+        medicine_name = (
+            best_result.candidates[0].medicine_name
+            if best_result.candidates
+            else None
+        )
+        text_answer, text_medicine, source = _text_rag_service().answer(
+            question, medicine_name
+        )
+        answer = (
+            f"[Image RAG - {best_result.status}]\n{best_result.answer}\n\n"
+            f"[Text RAG]\n{text_answer}"
+        )
+    except (FileNotFoundError, ValueError, RuntimeError) as error:
+        logger.warning("Local RAG chat failed: %s", error)
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    candidate = best_result.candidates[0] if best_result.candidates else None
+    return FullRagResponse(
+        answer=answer,
+        medicine_name=text_medicine or medicine_name,
+        source=source or None,
+        image_status=best_result.status,
+        image_similarity=candidate.similarity if candidate else None,
+    )

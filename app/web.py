@@ -349,3 +349,22 @@ CHAT_PAGE = """<!doctype html>
 
 def chat_page() -> HTMLResponse:
     return HTMLResponse(CHAT_PAGE)
+
+
+LOCAL_CHAT_PAGE = CHAT_PAGE.replace(
+    "<title>Thuốc AI</title>",
+    "<title>Thuốc AI - Local RAG</title>",
+).replace(
+    "<small>Trợ lý nhận diện và giải đáp thuốc</small>",
+    "<small>Local RAG - không dùng LLM</small>",
+).replace(
+    'fetch(API + "/rag-chat"',
+    'fetch(API + "/local-rag-chat"',
+).replace(
+    "AI có thể mắc lỗi. Hãy dùng thông tin như tài liệu tham khảo.",
+    "Kết quả lấy trực tiếp từ Image RAG và Text RAG local.",
+)
+
+
+def local_chat_page() -> HTMLResponse:
+    return HTMLResponse(LOCAL_CHAT_PAGE)

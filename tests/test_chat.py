@@ -30,6 +30,14 @@ def test_web_page_is_served_at_root() -> None:
     assert "Thuốc AI" in response.text
 
 
+def test_local_chat_page_is_available() -> None:
+    response = TestClient(app).get("/api/v1/local-chat")
+
+    assert response.status_code == 200
+    assert "Local RAG - không dùng LLM" in response.text
+    assert '"/local-rag-chat"' in response.text
+
+
 def test_gemini_rejects_non_image_upload() -> None:
     response = TestClient(app).post(
         "/api/v1/gemini/vision",
