@@ -18,6 +18,15 @@ data/
   annotations/            # Annotation của từng nhánh
   processed/              # Output trung gian
 
+models/
+  .gitkeep                # Thư mục chung cho model của các branch
+
+scripts/
+  .gitkeep                # Thư mục chung cho script của các branch
+
+notebooks/
+  .gitkeep                # Thư mục chung cho notebook nghiên cứu
+
 tests/                    # Test chung và test theo branch
 pyproject.toml            # Dependency nền tảng
 ```
@@ -30,8 +39,8 @@ feature/few-shot-rag-img -> embedding, FAISS và pill index
 feature/rag-text         -> Text RAG và text index
 ```
 
-Các thư mục model và index chỉ xuất hiện trên branch tính năng tương ứng,
-không tạo sẵn trên `main`.
+Model, index, script và notebook cụ thể chỉ xuất hiện trên branch tính năng
+tương ứng; `main` chỉ giữ các thư mục chung rỗng.
 
 ## Cài đặt
 
