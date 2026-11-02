@@ -18,9 +18,6 @@ data/
   annotations/            # Annotation của từng nhánh
   processed/              # Output trung gian
 
-models/
-  mobilenet/              # Chỗ dành cho branch MobileNet
-
 tests/                    # Test chung và test theo branch
 pyproject.toml            # Dependency nền tảng
 ```
@@ -32,6 +29,9 @@ feature/yolo              -> adapter YOLO và best.pt
 feature/few-shot-rag-img -> embedding, FAISS và pill index
 feature/rag-text         -> Text RAG và text index
 ```
+
+Các thư mục model và index chỉ xuất hiện trên branch tính năng tương ứng,
+không tạo sẵn trên `main`.
 
 ## Cài đặt
 
