@@ -1,278 +1,57 @@
 # Medicine AI Research
 
-Backend skeleton cho nghiên cứu nhận diện nhiều loại thuốc trong một ảnh:
+Khung project chung cho các nhánh nghiên cứu nhận diện thuốc. `main` không
+chứa model, checkpoint, index hay adapter của một nhánh cụ thể.
+
+## Cấu trúc
 
 ```text
-Ảnh thuốc -> YOLO detection/crop -> MobileNet classification
-           -> few-shot embedding -> FAISS retrieval -> VLM trả lời
+app/
+  api/                    # API contract chung
+  core/                   # Hạ tầng dùng chung
+  schemas/                # Format request/response chung
+  services/
+    pipeline.py           # Interface pipeline mở rộng
+
+data/
+  raw/                    # Dữ liệu gốc của từng nhánh
+  annotations/            # Annotation của từng nhánh
+  processed/              # Output trung gian
+
+models/
+  mobilenet/              # Chỗ dành cho branch MobileNet
+
+tests/                    # Test chung và test theo branch
+pyproject.toml            # Dependency nền tảng
 ```
 
-> Đây là dự án nghiên cứu. Kết quả nhận diện không thay thế tư vấn của bác sĩ
-> hoặc hướng dẫn sử dụng thuốc chính thức.
+Các branch tự thêm thư mục, dependency, code và model cần thiết. Ví dụ:
 
-## 1. Yêu cầu môi trường
-
-- Windows, Python 3.10 trở lên
-- Git
-- Có thể dùng PowerShell hoặc terminal tích hợp trong VS Code
-
-Kiểm tra Python:
-
-```powershell
-py -3 --version
+```text
+feature/yolo              -> adapter YOLO và best.pt
+feature/few-shot-rag-img -> embedding, FAISS và pill index
+feature/rag-text         -> Text RAG và text index
 ```
 
-Nếu lệnh trên không chạy, cài Python từ python.org và chọn **Add Python to PATH**
-trong quá trình cài đặt.
-
-## 2. Cài đặt lần đầu
-
-Mở PowerShell tại thư mục repository:
+## Cài đặt
 
 ```powershell
-cd D:\My_File\code\NCKH
 py -3 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -e ".[dev]"
-```
-
-Nếu PowerShell chặn activate script, chỉ cần chạy Python trực tiếp trong
-virtual environment:
-
-```powershell
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 ```
 
-Mỗi thành viên cần tự tạo `.venv` trên máy của mình. Không commit thư mục này
-vào Git; `.gitignore` đã bỏ qua nó. Khi làm việc, kiểm tra interpreter đang dùng:
+## Chạy skeleton
 
 ```powershell
-python -c "import sys; print(sys.executable)"
-```
-
-Kết quả phải trỏ tới `D:\My_File\code\NCKH\.venv\Scripts\python.exe` (hoặc
-đường dẫn project tương ứng trên máy thành viên).
-
-Dependency dùng chung được khai báo trong `pyproject.toml`:
-
-```powershell
-pip install -e ".[dev]"       # test và phát triển API
-pip install -e ".[ml,dev]"    # thêm YOLO/OpenCV/PyTorch
-```
-
-## 3. Chạy và kiểm tra skeleton
-
-Chạy test:
-
-```powershell
-pytest
-```
-
-Khởi động API:
-
-```powershell
-uvicorn app.main:app --reload
+.\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
 
 Mở tài liệu API tại <http://127.0.0.1:8000/docs>.
 
-Kiểm tra server:
+## Quy ước
 
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/api/v1/health
-```
-
-Kết quả:
-
-```json
-{"status": "ok"}
-```
-
-Endpoint dự đoán hiện trả `501 Not Implemented`. Đây là hành vi có chủ đích:
-chưa tích hợp model thật thì không được trả kết quả giả.
-
-## 3.1. Đưa model YOLO hiện có vào project
-
-Code adapter YOLO nằm tại
-[`app/services/detection.py`](./app/services/detection.py). Model weights không
-được commit vào Git. Hãy tạo thư mục `models/yolo/` và copy file:
-
-```text
-D:\My_File\code\python\New folder\Model\Mo_Hinh_YOLO\best.pt
-```
-
-vào:
-
-```text
-models/yolo/best.pt
-```
-
-Cài thêm dependency cho YOLO:
-
-```powershell
-pip install -e ".[ml,dev]"
-```
-
-Adapter nhận ảnh OpenCV dạng `numpy.ndarray`, chạy YOLO, lưu các crop vào
-`data/processed/` và trả mỗi detection theo format:
-
-```json
-{
-  "label": "hop",
-  "confidence": 0.92,
-  "bounding_box": [100, 80, 350, 500],
-  "crop_path": "data/processed/image_001_crop_0.jpg"
-}
-```
-
-Hiện adapter chưa tự nối vào `/predict`; bước tiếp theo là inject detector vào
-`pipeline.py` và route sau khi thống nhất cách lưu file upload.
-
-## 4. Cấu trúc thư mục
-
-```text
-app/
-  api/
-    routes.py          # Nhận request và trả response HTTP
-  core/                # Cấu hình, logging và hạ tầng dùng chung
-  schemas/
-    prediction.py      # Format input/output chuẩn
-  services/
-    pipeline.py        # Interface điều phối pipeline
-    detection.py       # Sẽ chứa adapter YOLO
-    classification.py  # Sẽ chứa adapter MobileNet
-    retrieval.py       # Sẽ chứa adapter FAISS
-    vlm.py             # Sẽ chứa adapter VLM
-  main.py              # Khởi tạo FastAPI
-
-data/
-  raw/                 # Ảnh gốc; không commit ảnh thật
-  processed/           # Ảnh crop và kết quả tiền xử lý
-  annotations/         # Nhãn YOLO và metadata
-
-models/                # Weights/index; không commit file lớn
-tests/                 # Unit/API tests
-pyproject.toml         # Dependency và cấu hình test
-```
-
-`data/` và `models/` chỉ có `.gitkeep` trong Git. Ảnh thật, weights (`.pt`,
-`.pth`, `.onnx`) và FAISS index cần được quản lý bằng storage riêng hoặc Git
-LFS theo quy định của nhóm.
-
-## 5. Quy ước output giữa các module
-
-YOLO nhận ảnh gốc và trả các detection/crop:
-
-```python
-{
-    "crop_path": "data/processed/image_001_crop_01.jpg",
-    "bounding_box": [100, 80, 300, 400],
-    "confidence": 0.95,
-}
-```
-
-MobileNet nhận một crop và trả:
-
-```python
-{
-    "label": "paracetamol",
-    "confidence": 0.91,
-}
-```
-
-FAISS nhận embedding của crop và trả các kết quả gần nhất kèm metadata. VLM
-chỉ tổng hợp từ ảnh và các kết quả có nguồn, không tự thay thế dữ liệu model.
-
-## 6. Cách chia việc
-
-### Nhánh data/YOLO
-
-```text
-data/raw/
-data/annotations/
-data/processed/
-app/services/detection.py
-```
-
-Phụ trách thu thập ảnh, gán bounding box, train YOLO, inference và crop.
-
-### Nhánh few-shot ảnh viên
-
-```text
-notebooks/train_pill_embedding_colab.py
-data/pill_dataset/
-data/pill_queries/
-data/pill_index/
-```
-
-Phụ trách fine-tune embedding model cho ảnh viên thuốc, xây FAISS index và ánh
-xạ kết quả tới metadata thuốc. Nhánh này không sửa phần MobileNet phân loại
-`hop/vi/thuoc` của nhánh khác.
-
-### Các bước tiếp theo
-
-1. Hoàn thiện dataset và YOLO.
-2. Hoàn thiện MobileNet phân loại `hop/vi/thuoc`.
-3. Train embedding model cho ảnh viên.
-4. Xây FAISS index và metadata.
-5. Thêm VLM sau khi retrieval đã trả metadata đáng tin cậy.
-
-## 7. Quy trình Git và Pull Request
-
-`main` chỉ chứa code đã review. Mỗi task làm trên một branch riêng:
-
-```text
-main
-├── feature/data-preparation
-├── feature/yolo
-├── feature/mobilenet-classification
-├── feature/few-shot-rag-img
-└── feature/vlm-answering
-```
-
-Quy ước hiện tại:
-
-- `main`: code đã review và tài liệu/quy ước dùng chung; không code trực tiếp.
-- `feature/yolo`: YOLO detection và crop, không bao gồm MobileNet phân loại.
-- `feature/mobilenet-classification`: MobileNet phân loại `hop`, `vi`, `thuoc`.
-- `feature/few-shot-rag-img`: embedding ảnh viên, FAISS và metadata nguồn.
-- `feature/vlm-answering`: tổng hợp câu trả lời từ ảnh, retrieval và tài liệu.
-
-Tên branch dùng chữ thường, dấu gạch ngang và mô tả đúng một task. Không dùng
-chung một branch cho nhiều task không liên quan. Nếu branch cần code từ branch
-khác, ghi rõ dependency trong PR và thống nhất schema giữa hai bên.
-
-Tạo branch mới:
-
-```powershell
-git switch main
-git pull origin main
-git switch -c feature/<ten-task>
-```
-
-Sau khi hoàn thành một lát cắt có thể chạy/test được:
-
-```powershell
-git add .
-git commit -m "feat: <mo-ta-ngan>"
-git push -u origin feature/<ten-task>
-```
-
-Tạo Pull Request từ branch đó vào `main`. PR nên có:
-
-- Mục đích và các file đã thay đổi
-- Input/output của module
-- Lệnh test đã chạy
-- Phần chưa triển khai hoặc giới hạn hiện tại
-
-Trước khi tạo PR, chạy tối thiểu:
-
-```powershell
-python -m pytest
-git diff --check
-git status --short
-```
-
-Không commit secrets, ảnh người dùng, weights lớn hoặc dữ liệu thật vào
-repository. Không code trực tiếp trên `main`.
+- Không commit model hoặc index của branch tính năng vào `main`.
+- Dùng Git LFS khi branch cần lưu file lớn.
+- Không để API giả tạo kết quả khi module/model chưa được nối.
+- Kết quả nhận diện thuốc chỉ mang tính dự đoán, không thay thế tư vấn y tế.
