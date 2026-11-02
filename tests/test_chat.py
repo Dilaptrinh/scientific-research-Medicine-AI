@@ -19,7 +19,9 @@ def test_user_message_is_rendered_before_image_validation() -> None:
     page = TestClient(app).get("/").text
     ask_body = page[page.index("async function ask()"):]
 
-    assert ask_body.index('add(text, "user", null, true') < ask_body.index("if (!file)")
+    assert ask_body.index('add(text, "user", null, true') < ask_body.index(
+        "if (!file && !LOCAL_MODE)"
+    )
 
 
 def test_web_page_is_served_at_root() -> None:
@@ -36,7 +38,7 @@ def test_local_chat_page_is_available() -> None:
     assert response.status_code == 200
     assert "Local RAG - không dùng LLM" in response.text
     assert '"/local-rag-chat"' in response.text
-    assert "mình cần ảnh thuốc để nhận diện" not in response.text
+    assert "const LOCAL_MODE = true;" in response.text
 
 
 def test_gemini_rejects_non_image_upload() -> None:

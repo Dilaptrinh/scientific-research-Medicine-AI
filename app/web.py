@@ -124,6 +124,7 @@ CHAT_PAGE = """<!doctype html>
   const status = document.getElementById("status");
   const MAX_BYTES = 10 * 1024 * 1024;
   const STORAGE_KEY = "thuocai.chat.v1";
+  const LOCAL_MODE = false;
   let history = [];
   let transcript = [];
   let busy = false;
@@ -284,7 +285,7 @@ CHAT_PAGE = """<!doctype html>
     add(text, "user", null, true, messageImageUrl);
     question.value = "";
     question.style.height = "42px";
-    if (!file) {
+    if (!file && !LOCAL_MODE) {
       add("Bạn đã gửi tin nhắn, nhưng mình cần ảnh thuốc để nhận diện. "
         + "Hãy bấm dấu ＋ để chọn ảnh rồi gửi lại câu hỏi nhé.", "model", "error");
       busy = false;
@@ -362,18 +363,10 @@ LOCAL_CHAT_PAGE = CHAT_PAGE.replace(
     'fetch(API + "/local-rag-chat"',
 ).replace(
     "AI có thể mắc lỗi. Hãy dùng thông tin như tài liệu tham khảo.",
-    "Kết quả lấy trực tiếp từ Image RAG và Text RAG local.",
-)
-LOCAL_CHAT_PAGE = LOCAL_CHAT_PAGE.replace(
-    '    if (!file) {\n'
-    '      add("Bạn đã gửi tin nhắn, nhưng mình cần ảnh thuốc để nhận diện. "\n'
-    '        + "Hãy bấm dấu ＋ để chọn ảnh rồi gửi lại câu hỏi nhé.", "model", "error");\n'
-    '      busy = false;\n'
-    '      send.disabled = false;\n'
-    '      question.focus();\n'
-    '      return;\n'
-    '    }\n',
-    ""
+   "Kết quả lấy trực tiếp từ Image RAG và Text RAG local.",
+).replace(
+   "const LOCAL_MODE = false;",
+   "const LOCAL_MODE = true;",
 )
 
 
