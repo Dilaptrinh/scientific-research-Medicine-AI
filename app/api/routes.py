@@ -1,5 +1,6 @@
 import logging
 import json
+import os
 from pathlib import Path
 from uuid import uuid4
 
@@ -199,4 +200,81 @@ async def gemini_vision(
             status_code=503,
             detail=f"Gemini vision failed: {type(error).__name__}: {error}",
         ) from error
+    return GeminiVisionResponse(answer=answer, model=service.model)
+
+
+@router.post("/rag-chat", response_model=GeminiVisionResponse)
+async def rag_chat(
+    question: str = Form(...),
+    image: UploadFile = File(...),
+    history: str = Form("[]"),
+) -> GeminiVisionResponse:
+    """Run the local vision/text RAG pipeline, then let an LLM phrase its result."""
+    import cv2
+    import numpy as np
+
+    content = await image.read()
+    decoded = cv2.imdecode(np.frombuffer(content, np.uint8), cv2.IMREAD_COLOR)
+    if decoded is None:
+        raise HTTPException(status_code=400, detail="Uploaded file is not a valid image.")
+    try:
+        parsed_history = json.loads(history)
+        if not isinstance(parsed_history, list):
+            raise ValueError("history must be a JSON array.")
+
+        from app.services.detection import YoloDetector
+        from app.services.gemini_vision import GeminiVisionService
+        from app.services.pill_rag import PillRagService
+
+        root = Path(__file__).resolve().parents[2]
+        image_id = uuid4().hex
+        detections = YoloDetector(
+            Path(os.getenv("YOLO_MODEL_PATH", root / "models" / "yolo" / "best.pt"))
+        ).detect(decoded, image_id)
+        if not detections:
+            raise RuntimeError("YOLO không phát hiện được viên thuốc trong ảnh.")
+
+        image_rag = PillRagService.from_paths(
+            index_path=root / "data" / "pill_index" / "pills.index",
+            metadata_path=root / "data" / "pill_index" / "pills.json",
+            knowledge_path=root / "data" / "medicine_knowledge" / "medicines.json",
+        )
+        best_result = None
+        for detection in detections:
+            crop = cv2.imread(detection.crop_path or "")
+            if crop is None:
+                continue
+            result = image_rag.search(crop)
+            if best_result is None or (
+                result.candidates
+                and (
+                    not best_result.candidates
+                    or result.candidates[0].similarity
+                    > best_result.candidates[0].similarity
+                )
+            ):
+                best_result = result
+        if best_result is None:
+            raise RuntimeError("Image RAG không đọc được vùng thuốc do YOLO tạo ra.")
+
+        medicine_name = (
+            best_result.candidates[0].medicine_name
+            if best_result.candidates
+            else None
+        )
+        text_answer, _, text_source = _text_rag_service().answer(
+            question, medicine_name
+        )
+        context = (
+            f"YOLO detections: {len(detections)} vùng thuốc.\n"
+            f"Image RAG status: {best_result.status}\n"
+            f"Image RAG result:\n{best_result.answer}\n"
+            f"Text RAG result:\n{text_answer}\n"
+            f"Text RAG source: {text_source or 'không có'}"
+        )
+        service = GeminiVisionService()
+        answer = service.generate_from_context(question, context, parsed_history)
+    except (FileNotFoundError, ValueError, RuntimeError) as error:
+        logger.warning("Local RAG chat failed: %s", error)
+        raise HTTPException(status_code=503, detail=str(error)) from error
     return GeminiVisionResponse(answer=answer, model=service.model)

@@ -65,22 +65,52 @@ class GeminiVisionService:
                 },
             ],
         })
+        return self._generate(contents, (
+            "Bạn là chatbot dự đoán và tư vấn thông tin thuốc bằng tiếng Việt. "
+            "Trả lời trực tiếp, tự nhiên và ngắn gọn như đang trò chuyện. "
+            "Nếu ảnh đủ rõ, hãy nêu tên thuốc dự đoán, dấu hiệu nhận biết, "
+            "mức độ tin cậy và trả lời đúng câu hỏi. Nếu ảnh chưa đủ rõ, "
+            "nói rõ chưa thể xác định và hỏi người dùng chụp thêm mặt vỉ, "
+            "nhãn hoặc ký hiệu trên viên. Không liệt kê hàng loạt tên thuốc "
+            "đoán mò. Chỉ nhắc xác minh với dược sĩ/bác sĩ một lần, thật ngắn, "
+            "khi thông tin không đủ hoặc câu hỏi liên quan liều dùng/an toàn. "
+            "Không lặp lại cảnh báo dài dòng ở mọi lượt."
+        ))
+
+    def generate_from_context(
+        self,
+        question: str,
+        context: str,
+        history: list[dict[str, Any]] | None = None,
+    ) -> str:
+        if not question.strip():
+            raise ValueError("Question must not be empty.")
+        if not context.strip():
+            raise ValueError("RAG context must not be empty.")
+        contents = list(history or [])
+        contents.append({
+            "role": "user",
+            "parts": [{
+                "text": (
+                    f"Câu hỏi của người dùng: {question}\n\n"
+                    "Kết quả từ các hệ thống RAG local (hãy chỉ dùng thông tin này, "
+                    "không tự đoán thêm):\n"
+                    f"{context}"
+                )
+            }],
+        })
+        return self._generate(contents, (
+            "Bạn là lớp diễn đạt hội thoại cho hệ thống Medicine AI. "
+            "Thông tin trong tin nhắn người dùng là kết quả từ YOLO, Image RAG "
+            "và Text RAG chạy local. Hãy trả lời tự nhiên bằng tiếng Việt, chỉ "
+            "dựa trên các kết quả đó, không tự nhận diện lại ảnh và không bịa "
+            "thông tin ngoài ngữ cảnh. Nếu kết quả không đủ, nói rõ giới hạn "
+            "và hỏi người dùng bổ sung thông tin cần thiết."
+        ))
+
+    def _generate(self, contents: list[dict[str, Any]], system_text: str) -> str:
         payload = {
-            "system_instruction": {
-                "parts": [{
-                    "text": (
-                        "Bạn là chatbot dự đoán và tư vấn thông tin thuốc bằng tiếng Việt. "
-                        "Trả lời trực tiếp, tự nhiên và ngắn gọn như đang trò chuyện. "
-                        "Nếu ảnh đủ rõ, hãy nêu tên thuốc dự đoán, dấu hiệu nhận biết, "
-                        "mức độ tin cậy và trả lời đúng câu hỏi. Nếu ảnh chưa đủ rõ, "
-                        "nói rõ chưa thể xác định và hỏi người dùng chụp thêm mặt vỉ, "
-                        "nhãn hoặc ký hiệu trên viên. Không liệt kê hàng loạt tên thuốc "
-                        "đoán mò. Chỉ nhắc xác minh với dược sĩ/bác sĩ một lần, thật ngắn, "
-                        "khi thông tin không đủ hoặc câu hỏi liên quan liều dùng/an toàn. "
-                        "Không lặp lại cảnh báo dài dòng ở mọi lượt."
-                    )
-                }]
-            },
+            "system_instruction": {"parts": [{"text": system_text}]},
             "contents": contents,
         }
         endpoint = (

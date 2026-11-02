@@ -299,7 +299,7 @@ CHAT_PAGE = """<!doctype html>
     form.append("image", file);
     form.append("history", JSON.stringify(history));
     try {
-      const response = await fetch(API + "/gemini/vision", { method: "POST", body: form });
+      const response = await fetch(API + "/rag-chat", { method: "POST", body: form });
       let data = {};
       try { data = await response.json(); } catch (_) { data = {}; }
       if (!response.ok) throw Error(friendlyError(response, data.detail));

@@ -8,7 +8,7 @@ def test_chat_page_is_available() -> None:
 
     assert response.status_code == 200
     assert "Thuốc AI" in response.text
-    assert '"/gemini/vision"' in response.text
+    assert '"/rag-chat"' in response.text
     assert "clearImage" in response.text
     assert "Máy chủ trả lỗi" in response.text
     assert "localStorage" in response.text
