@@ -15,3 +15,5 @@ models/*
 !models/.gitkeep
 !models/yolo/
 !models/yolo/.gitkeep
+!models/mobilenet/
+!models/mobilenet/.gitkeep
