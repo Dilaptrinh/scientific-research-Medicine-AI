@@ -1,10 +1,10 @@
 # Medicine AI Research
 
-Backend skeleton cho nghiên cứu nhận diện nhiều loại thuốc trong một ảnh:
+Local Image RAG cho nhận diện ảnh viên thuốc:
 
 ```text
-Ảnh thuốc -> YOLO detection/crop
-           -> few-shot embedding cho ảnh viên -> FAISS retrieval -> VLM trả lời
+Ảnh viên thuốc -> MobileNet embedding -> FAISS retrieval
+               -> medicine knowledge lookup
 ```
 
 > Đây là dự án nghiên cứu. Kết quả nhận diện không thay thế tư vấn của bác sĩ
@@ -34,143 +34,55 @@ cd D:\My_File\code\NCKH
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-pip install -e ".[dev]"
+pip install -e ".[ml,retrieval]"
 ```
 
 Nếu PowerShell chặn activate script, chỉ cần chạy Python trực tiếp trong
 virtual environment:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m pip install -e ".[ml,retrieval]"
 ```
 
-## 3. Chạy và kiểm tra skeleton
+## 3. Chạy Image RAG bằng terminal
 
-Chạy test:
+Tìm thuốc từ một ảnh viên thuốc:
 
 ```powershell
-pytest
+.\.venv\Scripts\python.exe scripts\search_pill_rag.py "D:\path\to\pill.jpg"
 ```
 
-Khởi động API:
-
-```powershell
-uvicorn app.main:app --reload
-```
-
-Mở tài liệu API tại <http://127.0.0.1:8000/docs>.
-
-Kiểm tra server:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/api/v1/health
-```
-
-Kết quả:
-
-```json
-{"status": "ok"}
-```
-
-Endpoint dự đoán hiện chỉ tích hợp YOLO detection/crop và cần có YOLO weights.
-
-## 3.1. Đưa model YOLO hiện có vào project
-
-Code adapter YOLO nằm tại
-[`app/services/detection.py`](./app/services/detection.py). Model weights không
-được commit vào Git. Hãy tạo thư mục `models/yolo/` và copy file:
-
-```text
-D:\My_File\code\python\New folder\Model\Mo_Hinh_YOLO\best.pt
-```
-
-vào:
-
-```text
-models/yolo/best.pt
-```
-
-Cài thêm dependency cho YOLO:
-
-```powershell
-pip install -e ".[ml,dev]"
-pip install -e ".[retrieval]" # thêm FAISS để tìm kiếm vector
-```
-
-Adapter nhận ảnh OpenCV dạng `numpy.ndarray`, chạy YOLO, lưu các crop vào
-`data/processed/` và trả mỗi detection theo format:
-
-```json
-{
-  "label": "hop",
-  "confidence": 0.92,
-  "bounding_box": [100, 80, 350, 500],
-  "crop_path": "data/processed/image_001_crop_0.jpg"
-}
-```
+Kết quả in JSON gồm top-k ứng viên, độ tương đồng và thông tin knowledge base.
+Image RAG nhận ảnh crop viên thuốc; bước YOLO thuộc branch khác.
 
 ## 4. Cấu trúc thư mục
 
 ```text
 app/
-  api/
-    routes.py          # Nhận request và trả response HTTP
-  core/                # Cấu hình, logging và hạ tầng dùng chung
-  schemas/
-    prediction.py      # Format input/output chuẩn
   services/
-    detection.py       # Adapter YOLO và lưu crop
-    pill_embedding.py   # Encoder few-shot cho ảnh viên thuốc
-    retrieval.py       # Adapter FAISS và metadata nguồn
-    vlm.py             # Sẽ chứa adapter VLM
-  main.py              # Khởi tạo FastAPI
+    pill_embedding.py  # MobileNet encoder cho ảnh viên thuốc
+    retrieval.py       # FAISS index và metadata
+    pill_rag.py        # Gom candidate và tra knowledge
 
 data/
-  raw/                 # Ảnh gốc; không commit ảnh thật
-  processed/           # Ảnh crop và kết quả tiền xử lý
-  annotations/         # Nhãn YOLO và metadata
   pill_dataset/        # Ảnh train embedding, chia theo tên thuốc
   pill_queries/        # Ảnh viên dùng để truy vấn
   pill_index/          # FAISS index và metadata
 
-models/                # Weights/index; không commit file lớn
-tests/                 # Unit/API tests
-pyproject.toml         # Dependency và cấu hình test
+models/mobilenet/      # Checkpoint embedding
+scripts/               # Build index, evaluate và search terminal
+pyproject.toml         # Dependency của project
 ```
 
-`data/` và `models/` chỉ có `.gitkeep` trong Git. Ảnh thật, weights (`.pt`,
-`.pth`, `.onnx`) và FAISS index cần được quản lý bằng storage riêng hoặc Git
-LFS theo quy định của nhóm.
+Checkpoint và FAISS index cần được quản lý bằng Git LFS hoặc storage của nhóm.
 
-## 5. Quy ước output giữa các module
+## 5. Luồng Image RAG
 
-YOLO nhận ảnh gốc và trả các detection/crop:
-
-```python
-{
-    "crop_path": "data/processed/image_001_crop_01.jpg",
-    "bounding_box": [100, 80, 300, 400],
-    "confidence": 0.95,
-}
-```
-
-Các script đọc ảnh bằng OpenCV, vì vậy embedding model nhận ảnh màu dạng
-`numpy.ndarray` theo thứ tự kênh BGR và trả vector chuẩn hóa. FAISS nhận vector đó và trả
-các kết quả gần nhất kèm metadata. VLM
-chỉ tổng hợp từ ảnh và các kết quả có nguồn, không tự thay thế dữ liệu model.
+Các script đọc ảnh bằng OpenCV. Embedder chuyển ảnh màu BGR thành vector chuẩn
+hóa; FAISS tìm các ảnh gần nhất; `pill_rag.py` gom kết quả theo thuốc, áp dụng
+ngưỡng tương đồng và tra thông tin trong knowledge base.
 
 ## 6. Cách chia việc
-
-### Nhánh data/YOLO
-
-```text
-data/raw/
-data/annotations/
-data/processed/
-app/services/detection.py
-```
-
-Phụ trách thu thập ảnh, gán bounding box, train YOLO, inference và crop.
 
 ### Nhánh few-shot ảnh viên
 
@@ -179,9 +91,7 @@ notebooks/train_pill_embedding_colab.py
 app/services/pill_embedding.py
 app/services/retrieval.py
 scripts/build_pill_index.py
-scripts/search_pill.py
-scripts/run_pill_search.py
-tests/test_retrieval.py
+scripts/search_pill_rag.py
 data/pill_dataset/
 data/pill_queries/
 data/pill_index/
@@ -243,8 +153,7 @@ Luồng RAG không phụ thuộc YOLO: nhận một ảnh crop, tạo embedding,
 gần nhất bằng FAISS, gom các ảnh theo `medicine_id`, áp dụng ngưỡng tin cậy và
 tra cứu knowledge base.
 
-Branch này chỉ xử lý ảnh viên thuốc đã được crop sẵn. YOLO vẫn là một pipeline
-độc lập và không được gọi bởi CLI hoặc API RAG crop-only.
+Branch này chỉ xử lý ảnh viên thuốc đã được crop sẵn; YOLO thuộc pipeline khác.
 
 Index hiện có được xây từ:
 
@@ -272,7 +181,7 @@ File `data/medicine_knowledge/medicines.json` hiện có 47 thuốc, 47 bệnh,
 36 hoạt chất, 32 hàm lượng và 32 cảnh báo. Một số trường vẫn để trống khi
 trang nguồn không nêu rõ; không suy đoán các trường này.
 
-Chạy RAG cho một crop đã được YOLO cắt:
+Chạy RAG cho một ảnh crop:
 
 ```powershell
 python scripts/search_pill_rag.py data/processed/crop_001.jpg
@@ -293,13 +202,6 @@ giá trị ban đầu và cần điều chỉnh bằng tập query độc lập:
 ```powershell
 python scripts/search_pill_rag.py data/processed/crop_001.jpg `
   --threshold 0.80 --top-k 5
-```
-
-API crop-only là `POST /api/v1/rag/predict`; endpoint này không chạy YOLO:
-
-```powershell
-curl.exe -X POST http://127.0.0.1:8000/api/v1/rag/predict `
-  -F "image=@data/processed/crop_001.jpg"
 ```
 
 Response gồm `status`, `answer`, danh sách candidate đã gom theo thuốc,
@@ -335,7 +237,7 @@ có nằm trong ba thuốc khác nhau đầu tiên hay không. Ảnh đặt tr�
 3. Chọn threshold dựa trên validation set, không dùng mặc định 0.75 như
    một kết luận độ tin cậy.
 
-VLM/LLM chưa cần ở giai đoạn này: template answer hiện tại đã trả kết quả
+VLM/LLM chưa cần ở giai đoạn này: template answer hiện tại trả kết quả
 retrieval có nguồn và cảnh báo, tránh để model tự đoán thông tin thuốc.
 
 ## 7. Quy trình Git và Pull Request
