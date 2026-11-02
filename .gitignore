@@ -11,6 +11,7 @@ data/annotations/*
 data/pill_dataset/*
 data/pill_queries/*
 data/pill_index/*
+data/text_index/*
 data/data_set_train_yolo/*
 models/*
 !data/raw/.gitkeep
@@ -19,6 +20,7 @@ models/*
 !data/pill_dataset/.gitkeep
 !data/pill_queries/.gitkeep
 !data/pill_index/.gitkeep
+!data/text_index/.gitkeep
 !models/.gitkeep
 !models/yolo/
 !models/yolo/.gitkeep

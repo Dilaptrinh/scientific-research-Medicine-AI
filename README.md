@@ -476,14 +476,17 @@ Tạo index Text RAG local một lần (lần đầu model embedding có thể c
 .\.venv\Scripts\python.exe scripts\build_text_index.py
 ```
 
-Lệnh này đọc `docs/rag-text/thuoc_48.csv` và tạo:
+Lệnh này đọc `docs/rag-text/thuoc_48.csv`, tạo embedding TF-IDF hoàn toàn
+offline và tạo:
 
 ```text
 data/text_index/text.index
 data/text_index/text.json
+data/text_index/text_model.json
 ```
 
-Sau đó API chỉ đọc FAISS local, không gọi Gemini hay dịch vụ hỏi đáp online.
+Sau đó API chỉ đọc FAISS local, không gọi Gemini, Hugging Face hay dịch vụ
+online nào.
 
 Khi đã có FAISS image index, dùng `POST /api/v1/full-rag/predict` với:
 
