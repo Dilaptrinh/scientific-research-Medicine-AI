@@ -538,12 +538,14 @@ sau đó chạy theo thứ tự:
 
 ```text
 ảnh → YOLO local → crop thuốc → Image RAG/FAISS local → Text RAG/FAISS local
-     → kết quả RAG dạng text → Gemini chỉ diễn đạt câu trả lời hội thoại
+     → Graph RAG local (quan hệ hỗ trợ) → kết quả RAG dạng text
+     → Gemini chỉ diễn đạt câu trả lời hội thoại
 ```
 
 Ảnh không được gửi trực tiếp cho Gemini trong luồng này. Gemini chỉ nhận
 context dạng text do các thành phần local tạo ra. Vì vậy YOLO model, Image
-FAISS index, Text FAISS index và knowledge base phải tồn tại trên máy local.
+FAISS index, Text FAISS index, Graph RAG CSV và knowledge base phải tồn tại
+trên máy local.
 Nếu thiếu artifact, API trả lỗi rõ ràng thay vì tự tạo kết quả giả.
 
 Gemini vẫn là thành phần online tùy chọn để diễn đạt câu trả lời. Cấu hình nằm

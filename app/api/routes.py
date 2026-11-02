@@ -44,6 +44,14 @@ def _text_rag_service():
     )
 
 
+def _graph_rag_context(medicine_name: str | None) -> str:
+    from app.services.graph_rag import GraphRagService
+
+    return GraphRagService.from_csv(
+        Path("docs/graph-neo4j/support.csv")
+    ).context(medicine_name)
+
+
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -271,12 +279,14 @@ async def rag_chat(
         text_answer, _, text_source = _text_rag_service().answer(
             question, medicine_name
         )
+        graph_context = _graph_rag_context(medicine_name)
         context = (
             f"YOLO detections: {len(detections)} vùng thuốc.\n"
             f"Image RAG status: {best_result.status}\n"
             f"Image RAG result:\n{best_result.answer}\n"
             f"Text RAG result:\n{text_answer}\n"
-            f"Text RAG source: {text_source or 'không có'}"
+            f"Text RAG source: {text_source or 'không có'}\n"
+            f"{graph_context}"
         )
         service = GeminiVisionService()
         answer = service.generate_from_context(question, context, parsed_history)
@@ -298,10 +308,11 @@ async def local_rag_chat(
     if image is None:
         try:
             answer, medicine_name, source = _text_rag_service().answer(question)
+            graph_context = _graph_rag_context(medicine_name)
         except (FileNotFoundError, ValueError) as error:
             raise HTTPException(status_code=503, detail=str(error)) from error
         return FullRagResponse(
-            answer=answer,
+            answer=f"[Text RAG]\n{answer}\n\n[Graph RAG]\n{graph_context}",
             medicine_name=medicine_name or None,
             source=source or None,
             image_status="not_run",
@@ -354,9 +365,11 @@ async def local_rag_chat(
         text_answer, text_medicine, source = _text_rag_service().answer(
             question, medicine_name
         )
+        graph_context = _graph_rag_context(text_medicine or medicine_name)
         answer = (
             f"[Image RAG - {best_result.status}]\n{best_result.answer}\n\n"
-            f"[Text RAG]\n{text_answer}"
+            f"[Text RAG]\n{text_answer}\n\n"
+            f"[Graph RAG]\n{graph_context}"
         )
     except (FileNotFoundError, ValueError, RuntimeError) as error:
         logger.warning("Local RAG chat failed: %s", error)
