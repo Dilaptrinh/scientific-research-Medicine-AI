@@ -46,13 +46,16 @@ class GeminiVisionService:
         }
         endpoint = (
             "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{self._model}:generateContent?key={self._api_key}"
+            f"{self._model}:generateContent"
         )
         body = json.dumps(payload).encode("utf-8")
         http_request = request.Request(
             endpoint,
             data=body,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "x-goog-api-key": self._api_key,
+            },
             method="POST",
         )
         try:
