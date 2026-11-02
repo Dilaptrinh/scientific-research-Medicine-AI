@@ -36,5 +36,19 @@ def run_text_rag_cli() -> None:
             print(f"Nguồn: {source}")
 
 
+def run_gemini_cli() -> None:
+    from app.services.gemini_vision import GeminiVisionService
+
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    image_path = Path(input("Đường dẫn ảnh: ").strip().strip('"'))
+    question = input("Câu hỏi: ").strip()
+    answer = GeminiVisionService().analyze_file(image_path, question)
+    print(f"\nGemini trả lời:\n{answer}")
+
+
 if __name__ == "__main__":
-    run_text_rag_cli()
+    if "--gemini" in sys.argv:
+        run_gemini_cli()
+    else:
+        run_text_rag_cli()

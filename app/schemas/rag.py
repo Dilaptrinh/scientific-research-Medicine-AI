@@ -41,3 +41,8 @@ class TextRagResponse(BaseModel):
 class FullRagResponse(TextRagResponse):
     image_status: str
     image_similarity: float | None = None
+
+
+class GeminiVisionResponse(BaseModel):
+    answer: str
+    model: str

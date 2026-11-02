@@ -517,6 +517,26 @@ Text RAG để trả lời. Image index cần được tạo trước bằng
 `scripts/build_pill_index.py`; nếu chưa có `data/pill_index/pills.index` và
 `pills.json`, endpoint sẽ trả HTTP 503 thay vì giả kết quả.
 
+### Gemini Vision (tùy chọn)
+
+Gemini Vision là luồng online riêng: upload ảnh trực tiếp cho Gemini để nhận
+câu trả lời, không thay thế FAISS local. Không ghi API key vào code hoặc Git.
+Sau khi revoke key đã lộ, tạo key mới và đặt trong terminal:
+
+```powershell
+$env:GEMINI_API_KEY = "KEY_MOI"
+```
+
+Chạy hỏi ảnh trong terminal VS Code:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.main --gemini
+```
+
+Hoặc dùng Swagger với `POST /api/v1/gemini/vision`, gồm hai trường `image` và
+`question`. Model mặc định là `gemini-2.0-flash`; có thể đổi bằng
+`$env:GEMINI_MODEL`.
+
 `main` chỉ chứa code đã review. Mỗi task làm trên một branch riêng:
 
 ```text

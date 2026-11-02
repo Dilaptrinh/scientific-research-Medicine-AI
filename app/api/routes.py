@@ -5,6 +5,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.schemas.rag import (
     FullRagResponse,
+    GeminiVisionResponse,
     PillRagResponse,
     RagCandidateResponse,
     RagKnowledgeResponse,
@@ -150,3 +151,23 @@ async def full_rag_predict(
         image_status=image_result.status,
         image_similarity=candidate.similarity if candidate else None,
     )
+
+
+@router.post("/gemini/vision", response_model=GeminiVisionResponse)
+async def gemini_vision(
+    question: str = Form(...),
+    image: UploadFile = File(...),
+) -> GeminiVisionResponse:
+    from app.services.gemini_vision import GeminiVisionService
+
+    content = await image.read()
+    try:
+        service = GeminiVisionService()
+        answer = service.analyze_image(
+            content,
+            image.content_type or "application/octet-stream",
+            question,
+        )
+    except (RuntimeError, ValueError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    return GeminiVisionResponse(answer=answer, model=service.model)
