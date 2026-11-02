@@ -1,0 +1,9 @@
+sentence-transformers
+faiss-cpu
+transformers
+accelerate
+pandas
+numpy
+torch
+# Chỉ cần khi dùng --load-in-4bit (mô hình 7B trở lên):
+# bitsandbytes

@@ -1,278 +1,111 @@
-# Medicine AI Research
+# RAG hỏi đáp thông tin thuốc
 
-Backend skeleton cho nghiên cứu nhận diện nhiều loại thuốc trong một ảnh:
+Hệ thống hỏi đáp tiếng Việt về 48 loại thuốc, dùng **Retrieval-Augmented Generation**:
 
-```text
-Ảnh thuốc -> YOLO detection/crop -> MobileNet classification
-           -> few-shot embedding -> FAISS retrieval -> VLM trả lời
-```
+1. Thông tin mỗi thuốc được cắt thành các đoạn theo mục (thông tin chung, chỉ định, liều dùng, chống chỉ định,
+   tác dụng phụ, lưu ý) và đánh chỉ mục bằng embedding `BAAI/bge-m3` + FAISS.
+2. Các cặp hỏi-đáp mẫu được đánh chỉ mục theo câu hỏi.
+3. Khi có câu hỏi:
+   - nếu **khớp một câu hỏi mẫu** (vượt ngưỡng): trả lời bằng câu trả lời mẫu, kèm 2–3 câu bổ sung từ tài liệu;
+   - nếu không: mô hình `Qwen2.5-3B-Instruct` viết câu trả lời **chỉ từ tài liệu**, bắt chước giọng văn các câu mẫu,
+     kèm nguồn.
+   - nếu câu hỏi có nhắc tên thuốc, chỉ tìm trong thông tin của thuốc đó.
 
-> Đây là dự án nghiên cứu. Kết quả nhận diện không thay thế tư vấn của bác sĩ
-> hoặc hướng dẫn sử dụng thuốc chính thức.
+> ⚠️ Đây là sản phẩm nghiên cứu, **không thay thế tư vấn của bác sĩ hoặc dược sĩ**. Câu trả lời do mô hình sinh
+> có thể sai hoặc thiếu; không dùng để tự quyết định dùng thuốc, đổi liều hay ngừng thuốc.
 
-## 1. Yêu cầu môi trường
-
-- Windows, Python 3.10 trở lên
-- Git
-- Có thể dùng PowerShell hoặc terminal tích hợp trong VS Code
-
-Kiểm tra Python:
-
-```powershell
-py -3 --version
-```
-
-Nếu lệnh trên không chạy, cài Python từ python.org và chọn **Add Python to PATH**
-trong quá trình cài đặt.
-
-## 2. Cài đặt lần đầu
-
-Mở PowerShell tại thư mục repository:
-
-```powershell
-cd D:\My_File\code\NCKH
-py -3 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -e ".[dev]"
-```
-
-Nếu PowerShell chặn activate script, chỉ cần chạy Python trực tiếp trong
-virtual environment:
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
-```
-
-Mỗi thành viên cần tự tạo `.venv` trên máy của mình. Không commit thư mục này
-vào Git; `.gitignore` đã bỏ qua nó. Khi làm việc, kiểm tra interpreter đang dùng:
-
-```powershell
-python -c "import sys; print(sys.executable)"
-```
-
-Kết quả phải trỏ tới `D:\My_File\code\NCKH\.venv\Scripts\python.exe` (hoặc
-đường dẫn project tương ứng trên máy thành viên).
-
-Dependency dùng chung được khai báo trong `pyproject.toml`:
-
-```powershell
-pip install -e ".[dev]"       # test và phát triển API
-pip install -e ".[ml,dev]"    # thêm YOLO/OpenCV/PyTorch
-```
-
-## 3. Chạy và kiểm tra skeleton
-
-Chạy test:
-
-```powershell
-pytest
-```
-
-Khởi động API:
-
-```powershell
-uvicorn app.main:app --reload
-```
-
-Mở tài liệu API tại <http://127.0.0.1:8000/docs>.
-
-Kiểm tra server:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/api/v1/health
-```
-
-Kết quả:
-
-```json
-{"status": "ok"}
-```
-
-Endpoint dự đoán hiện trả `501 Not Implemented`. Đây là hành vi có chủ đích:
-chưa tích hợp model thật thì không được trả kết quả giả.
-
-## 3.1. Đưa model YOLO hiện có vào project
-
-Code adapter YOLO nằm tại
-[`app/services/detection.py`](./app/services/detection.py). Model weights không
-được commit vào Git. Hãy tạo thư mục `models/yolo/` và copy file:
+## Cấu trúc
 
 ```text
-D:\My_File\code\python\New folder\Model\Mo_Hinh_YOLO\best.pt
+.
+├── main.py          # dòng lệnh: chat | eval-retrieval | eval-answer
+├── config.py        # cấu hình mặc định (đường dẫn, mô hình, ngưỡng, top-k)
+├── data.py          # đọc CSV, cắt đoạn theo mục, kiểm tra tên thuốc khớp giữa 2 file
+├── retriever.py     # embedding + FAISS, lọc theo tên thuốc
+├── generator.py     # tải LLM và sinh câu trả lời
+├── rag.py           # luồng trả lời (câu mẫu + bổ sung / viết từ tài liệu)
+├── evaluate.py      # đo độ chính xác truy xuất và chất lượng câu trả lời
+├── data/            # đặt 2 file CSV (xem data/README.md)
+├── requirements.txt
+└── .gitignore
 ```
 
-vào:
+| Cell trong notebook | File |
+|---|---|
+| 1. Cài thư viện | `requirements.txt` |
+| 3. Cấu hình | `config.py` |
+| 4. Đọc CSV, cắt đoạn | `data.py` |
+| 4. Embedding + FAISS; 7. Hàm tìm kiếm | `retriever.py` |
+| 5. Kiểm tra tên thuốc | `data.kiem_tra_ten_khop` (tự chạy khi khởi động) |
+| 6. Tải LLM; hàm `sinh` | `generator.py` |
+| 7. Hàm `hoi` | `rag.py` |
+| 8. Vòng lặp hỏi đáp | `main.py chat` |
+| 9–10. Đo độ chính xác | `evaluate.py` (`main.py eval-retrieval`, `eval-answer`) |
 
-```text
-models/yolo/best.pt
+## Cài đặt
+
+Yêu cầu Python ≥ 3.9. Nên có GPU (T4 trở lên); CPU vẫn chạy nhưng rất chậm với mô hình LLM.
+
+```bash
+pip install -r requirements.txt
 ```
 
-Cài thêm dependency cho YOLO:
+Lần chạy đầu sẽ tải mô hình từ Hugging Face (bge-m3 và Qwen2.5-3B, tổng vài GB).
 
-```powershell
-pip install -e ".[ml,dev]"
+## Chạy
+
+```bash
+# Hỏi đáp tương tác (gõ 'thoat' để dừng)
+python main.py chat
+
+# Hỏi một câu
+python main.py chat -q "Liều dùng của Becacold-E là bao nhiêu?"
+
+# Đo top-1 / top-k accuracy của truy xuất (không cần tải LLM, nhanh)
+python main.py eval-retrieval
+
+# Đo độ giống ngữ nghĩa giữa câu trả lời của hệ thống và đáp án gốc (lưu results/ket_qua_danh_gia.csv)
+python main.py eval-answer --so-cau 10
 ```
 
-Adapter nhận ảnh OpenCV dạng `numpy.ndarray`, chạy YOLO, lưu các crop vào
-`data/processed/` và trả mỗi detection theo format:
+Một số tuỳ chọn: `--file-thuoc`, `--file-qa`, `--embed-model`, `--llm-model`, `--top-k-doan`, `--top-k-qa`,
+`--no-qa`, `--no-bo-sung`. Xem tất cả: `python main.py chat --help`.
 
-```json
-{
-  "label": "hop",
-  "confidence": 0.92,
-  "bounding_box": [100, 80, 350, 500],
-  "crop_path": "data/processed/image_001_crop_0.jpg"
-}
+Dùng mô hình lớn hơn (cần bật nén 4-bit và cài `bitsandbytes`):
+
+```bash
+python main.py chat --llm-model Qwen/Qwen2.5-7B-Instruct --load-in-4bit
 ```
 
-Hiện adapter chưa tự nối vào `/predict`; bước tiếp theo là inject detector vào
-`pipeline.py` và route sau khi thống nhất cách lưu file upload.
+Các ngưỡng khớp câu mẫu (`nguong_co_ten = 0.78`, `nguong_khong_ten = 0.88`), số đoạn bổ sung và độ dài câu trả lời
+chỉnh trong `config.py`.
 
-## 4. Cấu trúc thư mục
+## Chạy trên Google Colab
 
-```text
-app/
-  api/
-    routes.py          # Nhận request và trả response HTTP
-  core/                # Cấu hình, logging và hạ tầng dùng chung
-  schemas/
-    prediction.py      # Format input/output chuẩn
-  services/
-    pipeline.py        # Interface điều phối pipeline
-    detection.py       # Sẽ chứa adapter YOLO
-    classification.py  # Sẽ chứa adapter MobileNet
-    retrieval.py       # Sẽ chứa adapter FAISS
-    vlm.py             # Sẽ chứa adapter VLM
-  main.py              # Khởi tạo FastAPI
-
-data/
-  raw/                 # Ảnh gốc; không commit ảnh thật
-  processed/           # Ảnh crop và kết quả tiền xử lý
-  annotations/         # Nhãn YOLO và metadata
-
-models/                # Weights/index; không commit file lớn
-tests/                 # Unit/API tests
-pyproject.toml         # Dependency và cấu hình test
-```
-
-`data/` và `models/` chỉ có `.gitkeep` trong Git. Ảnh thật, weights (`.pt`,
-`.pth`, `.onnx`) và FAISS index cần được quản lý bằng storage riêng hoặc Git
-LFS theo quy định của nhóm.
-
-## 5. Quy ước output giữa các module
-
-YOLO nhận ảnh gốc và trả các detection/crop:
+Chọn **Runtime → Change runtime type → T4 GPU**, rồi:
 
 ```python
-{
-    "crop_path": "data/processed/image_001_crop_01.jpg",
-    "bounding_box": [100, 80, 300, 400],
-    "confidence": 0.95,
-}
+!git clone https://github.com/<ban>/<repo>.git
+%cd <repo>
+!pip install -q -r requirements.txt
+
+from google.colab import drive
+drive.mount('/content/drive')
+
+# Dùng %run (không phải !python) để gõ được câu hỏi bằng bàn phím
+%run main.py chat --file-thuoc /content/drive/MyDrive/NCKH/thuoc_48.csv --file-qa /content/drive/MyDrive/NCKH/bo_tra_loi_cau_hoi.csv
 ```
 
-MobileNet nhận một crop và trả:
+## Về hai phép đo
 
-```python
-{
-    "label": "paracetamol",
-    "confidence": 0.91,
-}
-```
+- `eval-retrieval` tắt cả lọc theo tên thuốc lẫn cặp hỏi-đáp mẫu, để đo thuần khả năng tìm kiếm của embedding.
+- `eval-answer` tắt cặp hỏi-đáp mẫu để hệ thống không chép lại đáp án. Độ giống ngữ nghĩa cao chưa chắc đồng nghĩa
+  với đúng về chuyên môn; nên có người có chuyên môn xem xét lại các câu trả lời.
+- Phép đo lấy câu hỏi từ chính file hỏi-đáp mẫu. Nếu có thể, hãy tạo thêm bộ câu hỏi kiểm tra riêng, chưa xuất hiện
+  trong bộ mẫu, để số liệu phản ánh đúng khả năng với câu hỏi mới.
 
-FAISS nhận embedding của crop và trả các kết quả gần nhất kèm metadata. VLM
-chỉ tổng hợp từ ảnh và các kết quả có nguồn, không tự thay thế dữ liệu model.
+## Giấy phép dữ liệu và mô hình
 
-## 6. Cách chia việc
-
-### Nhánh data/YOLO
-
-```text
-data/raw/
-data/annotations/
-data/processed/
-app/services/detection.py
-```
-
-Phụ trách thu thập ảnh, gán bounding box, train YOLO, inference và crop.
-
-### Nhánh few-shot ảnh viên
-
-```text
-notebooks/train_pill_embedding_colab.py
-data/pill_dataset/
-data/pill_queries/
-data/pill_index/
-```
-
-Phụ trách fine-tune embedding model cho ảnh viên thuốc, xây FAISS index và ánh
-xạ kết quả tới metadata thuốc. Nhánh này không sửa phần MobileNet phân loại
-`hop/vi/thuoc` của nhánh khác.
-
-### Các bước tiếp theo
-
-1. Hoàn thiện dataset và YOLO.
-2. Hoàn thiện MobileNet phân loại `hop/vi/thuoc`.
-3. Train embedding model cho ảnh viên.
-4. Xây FAISS index và metadata.
-5. Thêm VLM sau khi retrieval đã trả metadata đáng tin cậy.
-
-## 7. Quy trình Git và Pull Request
-
-`main` chỉ chứa code đã review. Mỗi task làm trên một branch riêng:
-
-```text
-main
-├── feature/data-preparation
-├── feature/yolo
-├── feature/mobilenet-classification
-├── feature/few-shot-rag-img
-└── feature/vlm-answering
-```
-
-Quy ước hiện tại:
-
-- `main`: code đã review và tài liệu/quy ước dùng chung; không code trực tiếp.
-- `feature/yolo`: YOLO detection và crop, không bao gồm MobileNet phân loại.
-- `feature/mobilenet-classification`: MobileNet phân loại `hop`, `vi`, `thuoc`.
-- `feature/few-shot-rag-img`: embedding ảnh viên, FAISS và metadata nguồn.
-- `feature/vlm-answering`: tổng hợp câu trả lời từ ảnh, retrieval và tài liệu.
-
-Tên branch dùng chữ thường, dấu gạch ngang và mô tả đúng một task. Không dùng
-chung một branch cho nhiều task không liên quan. Nếu branch cần code từ branch
-khác, ghi rõ dependency trong PR và thống nhất schema giữa hai bên.
-
-Tạo branch mới:
-
-```powershell
-git switch main
-git pull origin main
-git switch -c feature/<ten-task>
-```
-
-Sau khi hoàn thành một lát cắt có thể chạy/test được:
-
-```powershell
-git add .
-git commit -m "feat: <mo-ta-ngan>"
-git push -u origin feature/<ten-task>
-```
-
-Tạo Pull Request từ branch đó vào `main`. PR nên có:
-
-- Mục đích và các file đã thay đổi
-- Input/output của module
-- Lệnh test đã chạy
-- Phần chưa triển khai hoặc giới hạn hiện tại
-
-Trước khi tạo PR, chạy tối thiểu:
-
-```powershell
-python -m pytest
-git diff --check
-git status --short
-```
-
-Không commit secrets, ảnh người dùng, weights lớn hoặc dữ liệu thật vào
-repository. Không code trực tiếp trên `main`.
+Trước khi công khai repo, hãy kiểm tra quyền sử dụng/đăng tải nội dung trong 2 file CSV (đặc biệt nếu sao chép từ
+tờ hướng dẫn sử dụng hoặc tài liệu có bản quyền), và điều khoản giấy phép của các mô hình
+`BAAI/bge-m3` và `Qwen/Qwen2.5-3B-Instruct`.
