@@ -3,8 +3,7 @@
 Backend skeleton cho nghiên cứu nhận diện nhiều loại thuốc trong một ảnh:
 
 ```text
-Ảnh thuốc -> YOLO detection/crop -> MobileNet classification
-           -> few-shot embedding -> FAISS retrieval -> VLM trả lời
+Ảnh thuốc -> YOLO detection/crop
 ```
 
 > Đây là dự án nghiên cứu. Kết quả nhận diện không thay thế tư vấn của bác sĩ
@@ -143,63 +142,25 @@ là ma trận của detector
 giữa `object` và `background`; ô `object → object` là dự đoán đúng, không phải
 ma trận phân loại `hop/vi/thuoc`.
 
-## 3.2. Branch YOLO + MobileNet phân loại loại vật thể
+## 3.2. Endpoint YOLO-only
 
-Branch triển khai phần này là:
-
-```text
-feature/yolo-mobilenet-type-classification
-```
-
-Luồng của branch:
-
-```text
-POST /api/v1/predict
-    -> YOLO phát hiện từng vùng
-    -> lưu crop
-    -> MobileNetV3 phân loại mỗi crop: hop, vi hoặc thuoc
-    -> trả bounding box + hai confidence
-```
-
-Code nằm ở:
-
-```text
-app/services/detection.py       # YOLO
-app/services/classification.py  # MobileNetV3 3 lớp
-app/services/pipeline.py        # nối hai model
-app/api/routes.py               # endpoint upload ảnh
-```
-
-MobileNet hiện có trong thư mục cũ (`mobilenet_thuoc_best*.pth`) là model phân
-loại **tên thuốc**, không phải model 3 lớp `hop/vi/thuoc`, nên không được đổi
-tên rồi dùng nhầm vào branch này. Cần đặt checkpoint đã train đúng 3 lớp tại:
-
-```text
-models/mobilenet/type_classifier.pth
-```
-
-Endpoint trả dạng:
+Branch `feature/yolo` chỉ làm detection và crop, không nạp MobileNet/CNN.
+Endpoint `POST /api/v1/predict` nhận một ảnh, tìm từng object bằng
+`models/yolo/best.pt`, lưu crop vào `data/processed/` và trả:
 
 ```json
 {
   "image_id": "generated-id",
   "detections": [
     {
-      "label": "hop",
+      "label": "object",
       "confidence": 0.92,
       "bounding_box": [100, 80, 350, 500],
-      "crop_path": "data/processed/generated-id_crop_0.jpg",
-      "classification": {
-        "label": "hop",
-        "confidence": 0.96
-      }
+      "crop_path": "data/processed/generated-id_crop_0.jpg"
     }
   ]
 }
 ```
-
-Nếu chưa có `type_classifier.pth`, endpoint sẽ không được xem là đã hoàn
-thiện; hãy train model 3 lớp trước khi tạo PR merge vào `main`.
 
 ## 4. Cấu trúc thư mục
 
