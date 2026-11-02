@@ -36,6 +36,7 @@ def test_local_chat_page_is_available() -> None:
     assert response.status_code == 200
     assert "Local RAG - không dùng LLM" in response.text
     assert '"/local-rag-chat"' in response.text
+    assert "mình cần ảnh thuốc để nhận diện" not in response.text
 
 
 def test_gemini_rejects_non_image_upload() -> None:

@@ -364,6 +364,17 @@ LOCAL_CHAT_PAGE = CHAT_PAGE.replace(
     "AI có thể mắc lỗi. Hãy dùng thông tin như tài liệu tham khảo.",
     "Kết quả lấy trực tiếp từ Image RAG và Text RAG local.",
 )
+LOCAL_CHAT_PAGE = LOCAL_CHAT_PAGE.replace(
+    '    if (!file) {\n'
+    '      add("Bạn đã gửi tin nhắn, nhưng mình cần ảnh thuốc để nhận diện. "\n'
+    '        + "Hãy bấm dấu ＋ để chọn ảnh rồi gửi lại câu hỏi nhé.", "model", "error");\n'
+    '      busy = false;\n'
+    '      send.disabled = false;\n'
+    '      question.focus();\n'
+    '      return;\n'
+    '    }\n',
+    ""
+)
 
 
 def local_chat_page() -> HTMLResponse:

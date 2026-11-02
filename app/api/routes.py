@@ -289,11 +289,24 @@ async def rag_chat(
 @router.post("/local-rag-chat", response_model=FullRagResponse)
 async def local_rag_chat(
     question: str = Form(...),
-    image: UploadFile = File(...),
+    image: UploadFile | None = File(None),
 ) -> FullRagResponse:
     """Run YOLO, Image RAG, and Text RAG without an LLM."""
     import cv2
     import numpy as np
+
+    if image is None:
+        try:
+            answer, medicine_name, source = _text_rag_service().answer(question)
+        except (FileNotFoundError, ValueError) as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+        return FullRagResponse(
+            answer=answer,
+            medicine_name=medicine_name or None,
+            source=source or None,
+            image_status="not_run",
+            image_similarity=None,
+        )
 
     content = await image.read()
     decoded = cv2.imdecode(np.frombuffer(content, np.uint8), cv2.IMREAD_COLOR)
