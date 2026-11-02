@@ -61,12 +61,6 @@ Kết quả JSON được in trực tiếp trên terminal. Các crop được l�
   --output data\processed
 ```
 
-Chạy test:
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest
-```
-
 ## 3.1. Đưa model YOLO hiện có vào project
 
 Code adapter YOLO nằm tại
@@ -158,8 +152,6 @@ lưu crop vào `data/processed/` và in kết quả:
 
 ```text
 app/
-  schemas/
-    prediction.py      # Format kết quả detection
   services/
     detection.py       # Adapter YOLO
 
@@ -169,8 +161,7 @@ data/
   annotations/         # Nhãn YOLO và metadata
 
 models/                # Weights/index; không commit file lớn
-tests/                 # Unit/API tests
-pyproject.toml         # Dependency và cấu hình test
+pyproject.toml         # Dependency của project
 ```
 
 `data/` và `models/` chỉ có `.gitkeep` trong Git. Ảnh thật, weights (`.pt`,
@@ -218,7 +209,6 @@ Phụ trách thu thập ảnh, gán bounding box, train YOLO, inference và crop
 
 ```text
 scripts/predict_yolo.py
-tests/
 ```
 
 Phụ trách phân loại crop, nối detector với classifier và kiểm thử API. Hai bên

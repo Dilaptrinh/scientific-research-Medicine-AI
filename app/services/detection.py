@@ -3,8 +3,6 @@ from pathlib import Path
 
 import numpy as np
 
-from app.schemas.prediction import Detection
-
 
 @dataclass(frozen=True)
 class YoloDetector:
@@ -31,7 +29,7 @@ class YoloDetector:
 
         object.__setattr__(self, "_model", YOLO(str(self.model_path)))
 
-    def detect(self, image: np.ndarray, image_id: str) -> list[Detection]:
+    def detect(self, image: np.ndarray, image_id: str) -> list[dict[str, object]]:
         results = self._model(
             image,
             verbose=False,
@@ -40,7 +38,7 @@ class YoloDetector:
         result = results[0]
         self.crop_directory.mkdir(parents=True, exist_ok=True)
 
-        detections: list[Detection] = []
+        detections: list[dict[str, object]] = []
         for index, box in enumerate(result.boxes):
             x1, y1, x2, y2 = (
                 int(value) for value in box.xyxy[0].cpu().tolist()
@@ -59,13 +57,11 @@ class YoloDetector:
             if not cv2.imwrite(str(crop_path), crop):
                 raise OSError(f"Could not save YOLO crop: {crop_path}")
 
-            detections.append(
-                Detection(
-                    label=label,
-                    confidence=confidence,
-                    bounding_box=(x1, y1, x2, y2),
-                    crop_path=str(crop_path),
-                )
-            )
+            detections.append({
+                "label": label,
+                "confidence": confidence,
+                "bounding_box": (x1, y1, x2, y2),
+                "crop_path": str(crop_path),
+            })
 
         return detections

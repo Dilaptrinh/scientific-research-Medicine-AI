@@ -51,7 +51,7 @@ def main() -> None:
     detections = detector.detect(image, image_id)
     print(json.dumps({
         "image_id": image_id,
-        "detections": [detection.model_dump() for detection in detections],
+        "detections": detections,
     }, indent=2))
 
 
