@@ -1,17 +1,20 @@
-.venv/
+# Bí mật
+.env
+
+# Python
 __pycache__/
-.pytest_cache/
 *.py[cod]
+.venv/
+venv/
+
+# Notebook / IDE
+.ipynb_checkpoints/
+.idea/
+.vscode/
+
+# Kết quả huấn luyện của PyKEEN
+pykeen_results/
 *.pt
-*.pth
-*.onnx
-data/raw/*
-data/processed/*
-data/annotations/*
-models/*
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-!data/annotations/.gitkeep
-!models/.gitkeep
-!models/yolo/
-!models/yolo/.gitkeep
+
+# Dữ liệu: bỏ dấu # ở dòng dưới nếu KHÔNG muốn đưa file CSV lên GitHub
+# data/*.csv

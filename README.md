@@ -1,278 +1,91 @@
-# Medicine AI Research
+# Chọn tổ hợp thuốc bằng đồ thị Neo4j + PyKEEN
 
-Backend skeleton cho nghiên cứu nhận diện nhiều loại thuốc trong một ảnh:
+Chương trình xây hai quan hệ **HỖ TRỢ** và **XUNG ĐỘT** giữa các thuốc trong Neo4j, huấn luyện
+Knowledge Graph Embedding bằng PyKEEN, rồi xếp hạng các tổ hợp viên thuốc:
 
-```text
-Ảnh thuốc -> YOLO detection/crop -> MobileNet classification
-           -> few-shot embedding -> FAISS retrieval -> VLM trả lời
-```
+- Mỗi viên thuốc được nhập là **chắc chắn** (1 tên) hoặc **nghi ngờ** (2–3 tên cách nhau bằng `/`).
+- Chương trình thử mọi kịch bản có thể, **loại tổ hợp có cặp xung đột đã khai báo**, **cộng điểm thưởng
+  cho cặp hỗ trợ đã khai báo**, và in ra **top K** tổ hợp điểm cao nhất.
 
-> Đây là dự án nghiên cứu. Kết quả nhận diện không thay thế tư vấn của bác sĩ
-> hoặc hướng dẫn sử dụng thuốc chính thức.
+> ⚠️ Đây là công cụ nghiên cứu. Điểm số từ mô hình embedding **không phải** chỉ định hay tư vấn y tế.
 
-## 1. Yêu cầu môi trường
-
-- Windows, Python 3.10 trở lên
-- Git
-- Có thể dùng PowerShell hoặc terminal tích hợp trong VS Code
-
-Kiểm tra Python:
-
-```powershell
-py -3 --version
-```
-
-Nếu lệnh trên không chạy, cài Python từ python.org và chọn **Add Python to PATH**
-trong quá trình cài đặt.
-
-## 2. Cài đặt lần đầu
-
-Mở PowerShell tại thư mục repository:
-
-```powershell
-cd D:\My_File\code\NCKH
-py -3 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -e ".[dev]"
-```
-
-Nếu PowerShell chặn activate script, chỉ cần chạy Python trực tiếp trong
-virtual environment:
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
-```
-
-Mỗi thành viên cần tự tạo `.venv` trên máy của mình. Không commit thư mục này
-vào Git; `.gitignore` đã bỏ qua nó. Khi làm việc, kiểm tra interpreter đang dùng:
-
-```powershell
-python -c "import sys; print(sys.executable)"
-```
-
-Kết quả phải trỏ tới `D:\My_File\code\NCKH\.venv\Scripts\python.exe` (hoặc
-đường dẫn project tương ứng trên máy thành viên).
-
-Dependency dùng chung được khai báo trong `pyproject.toml`:
-
-```powershell
-pip install -e ".[dev]"       # test và phát triển API
-pip install -e ".[ml,dev]"    # thêm YOLO/OpenCV/PyTorch
-```
-
-## 3. Chạy và kiểm tra skeleton
-
-Chạy test:
-
-```powershell
-pytest
-```
-
-Khởi động API:
-
-```powershell
-uvicorn app.main:app --reload
-```
-
-Mở tài liệu API tại <http://127.0.0.1:8000/docs>.
-
-Kiểm tra server:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/api/v1/health
-```
-
-Kết quả:
-
-```json
-{"status": "ok"}
-```
-
-Endpoint dự đoán hiện trả `501 Not Implemented`. Đây là hành vi có chủ đích:
-chưa tích hợp model thật thì không được trả kết quả giả.
-
-## 3.1. Đưa model YOLO hiện có vào project
-
-Code adapter YOLO nằm tại
-[`app/services/detection.py`](./app/services/detection.py). Model weights không
-được commit vào Git. Hãy tạo thư mục `models/yolo/` và copy file:
+## Cấu trúc
 
 ```text
-D:\My_File\code\python\New folder\Model\Mo_Hinh_YOLO\best.pt
+.
+├── main.py            # điểm vào: build -> train -> nhập thuốc -> in top K
+├── config.py          # cấu hình, đọc thông tin Neo4j từ biến môi trường / .env
+├── neo4j_graph.py     # nạp CSV vào Neo4j và đọc lại cặp hỗ trợ / xung đột / triple
+├── embedding.py       # train PyKEEN và tính điểm một cặp thuốc
+├── scoring.py         # loại xung đột, thưởng hỗ trợ, xếp hạng tổ hợp
+├── data/              # đặt support.csv và conflict.csv (xem data/README.md)
+├── requirements.txt
+├── .env.example
+└── .gitignore
 ```
 
-vào:
+Phân chia từ notebook gốc:
 
-```text
-models/yolo/best.pt
+| Mục trong notebook | Nằm ở file |
+|---|---|
+| 1. Cài thư viện | `requirements.txt` |
+| 3. Cấu hình | `config.py` (+ `.env`) |
+| 4. Xây đồ thị Neo4j | `neo4j_graph.py` |
+| 4. Train PyKEEN, tính score | `embedding.py` |
+| 5. Chấm điểm tổ hợp | `scoring.py` |
+| 6–7. Chạy và nhập thuốc | `main.py` |
+
+## Cài đặt
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env      # rồi điền NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
 ```
 
-Cài thêm dependency cho YOLO:
+Tạo database miễn phí tại [Neo4j Aura](https://neo4j.com/cloud/aura/) để lấy URI, user và password.
 
-```powershell
-pip install -e ".[ml,dev]"
+## Chạy
+
+```bash
+# Nhập thuốc từ bàn phím
+python main.py
+
+# Không tương tác: mỗi viên là một chuỗi, viên nghi ngờ cách nhau bằng '/'
+python main.py --drugs "Paracetamol" "Aspirin / Ibuprofen / Naproxen"
+
+# Đổi tham số
+python main.py --epochs 200 --top-k 5 --bonus 0.8 --file-ho-tro path/support.csv --file-xung-dot path/conflict.csv
 ```
 
-Adapter nhận ảnh OpenCV dạng `numpy.ndarray`, chạy YOLO, lưu các crop vào
-`data/processed/` và trả mỗi detection theo format:
+Xem tất cả tuỳ chọn: `python main.py --help`.
 
-```json
-{
-  "label": "hop",
-  "confidence": 0.92,
-  "bounding_box": [100, 80, 350, 500],
-  "crop_path": "data/processed/image_001_crop_0.jpg"
-}
-```
-
-Hiện adapter chưa tự nối vào `/predict`; bước tiếp theo là inject detector vào
-`pipeline.py` và route sau khi thống nhất cách lưu file upload.
-
-## 4. Cấu trúc thư mục
-
-```text
-app/
-  api/
-    routes.py          # Nhận request và trả response HTTP
-  core/                # Cấu hình, logging và hạ tầng dùng chung
-  schemas/
-    prediction.py      # Format input/output chuẩn
-  services/
-    pipeline.py        # Interface điều phối pipeline
-    detection.py       # Sẽ chứa adapter YOLO
-    classification.py  # Sẽ chứa adapter MobileNet
-    retrieval.py       # Sẽ chứa adapter FAISS
-    vlm.py             # Sẽ chứa adapter VLM
-  main.py              # Khởi tạo FastAPI
-
-data/
-  raw/                 # Ảnh gốc; không commit ảnh thật
-  processed/           # Ảnh crop và kết quả tiền xử lý
-  annotations/         # Nhãn YOLO và metadata
-
-models/                # Weights/index; không commit file lớn
-tests/                 # Unit/API tests
-pyproject.toml         # Dependency và cấu hình test
-```
-
-`data/` và `models/` chỉ có `.gitkeep` trong Git. Ảnh thật, weights (`.pt`,
-`.pth`, `.onnx`) và FAISS index cần được quản lý bằng storage riêng hoặc Git
-LFS theo quy định của nhóm.
-
-## 5. Quy ước output giữa các module
-
-YOLO nhận ảnh gốc và trả các detection/crop:
+## Chạy trên Google Colab
 
 ```python
-{
-    "crop_path": "data/processed/image_001_crop_01.jpg",
-    "bounding_box": [100, 80, 300, 400],
-    "confidence": 0.95,
-}
+!git clone https://github.com/<ban>/<repo>.git
+%cd <repo>
+!pip install -q -r requirements.txt
+
+import os
+from google.colab import drive, userdata        # lưu bí mật trong Colab: biểu tượng chìa khoá ở thanh trái
+drive.mount('/content/drive')
+for k in ("NEO4J_URI", "NEO4J_USER", "NEO4J_PASSWORD"):
+    os.environ[k] = userdata.get(k)
+
+# Dùng %run (không phải !python) để gõ được thuốc bằng bàn phím
+%run main.py --file-ho-tro /content/drive/MyDrive/NCKH/support.csv --file-xung-dot /content/drive/MyDrive/NCKH/conflict.csv
 ```
 
-MobileNet nhận một crop và trả:
+## Lưu ý
 
-```python
-{
-    "label": "paracetamol",
-    "confidence": 0.91,
-}
-```
+- **Mỗi lần chạy sẽ xoá toàn bộ node `:Thuoc` trong database đang kết nối** rồi nạp lại từ CSV. Chỉ dùng
+  database dành riêng cho dự án này.
+- Mô hình PyKEEN được train lại mỗi lần chạy `main.py`. Chế độ tương tác cho phép thử nhiều danh sách mà không phải train lại.
+- Thuốc chưa có trong đồ thị sẽ có điểm PyKEEN bằng 0 (chương trình có cảnh báo khi nhập).
+- Số kịch bản = tích số lượng tên của từng viên; vượt `TOI_DA_KICH_BAN` (mặc định 5000) thì chương trình từ chối chạy.
 
-FAISS nhận embedding của crop và trả các kết quả gần nhất kèm metadata. VLM
-chỉ tổng hợp từ ảnh và các kết quả có nguồn, không tự thay thế dữ liệu model.
+## Bảo mật khi đưa lên GitHub
 
-## 6. Cách chia việc
-
-### Nhánh data/YOLO
-
-```text
-data/raw/
-data/annotations/
-data/processed/
-app/services/detection.py
-```
-
-Phụ trách thu thập ảnh, gán bounding box, train YOLO, inference và crop.
-
-### Nhánh few-shot ảnh viên
-
-```text
-notebooks/train_pill_embedding_colab.py
-data/pill_dataset/
-data/pill_queries/
-data/pill_index/
-```
-
-Phụ trách fine-tune embedding model cho ảnh viên thuốc, xây FAISS index và ánh
-xạ kết quả tới metadata thuốc. Nhánh này không sửa phần MobileNet phân loại
-`hop/vi/thuoc` của nhánh khác.
-
-### Các bước tiếp theo
-
-1. Hoàn thiện dataset và YOLO.
-2. Hoàn thiện MobileNet phân loại `hop/vi/thuoc`.
-3. Train embedding model cho ảnh viên.
-4. Xây FAISS index và metadata.
-5. Thêm VLM sau khi retrieval đã trả metadata đáng tin cậy.
-
-## 7. Quy trình Git và Pull Request
-
-`main` chỉ chứa code đã review. Mỗi task làm trên một branch riêng:
-
-```text
-main
-├── feature/data-preparation
-├── feature/yolo
-├── feature/mobilenet-classification
-├── feature/few-shot-rag-img
-└── feature/vlm-answering
-```
-
-Quy ước hiện tại:
-
-- `main`: code đã review và tài liệu/quy ước dùng chung; không code trực tiếp.
-- `feature/yolo`: YOLO detection và crop, không bao gồm MobileNet phân loại.
-- `feature/mobilenet-classification`: MobileNet phân loại `hop`, `vi`, `thuoc`.
-- `feature/few-shot-rag-img`: embedding ảnh viên, FAISS và metadata nguồn.
-- `feature/vlm-answering`: tổng hợp câu trả lời từ ảnh, retrieval và tài liệu.
-
-Tên branch dùng chữ thường, dấu gạch ngang và mô tả đúng một task. Không dùng
-chung một branch cho nhiều task không liên quan. Nếu branch cần code từ branch
-khác, ghi rõ dependency trong PR và thống nhất schema giữa hai bên.
-
-Tạo branch mới:
-
-```powershell
-git switch main
-git pull origin main
-git switch -c feature/<ten-task>
-```
-
-Sau khi hoàn thành một lát cắt có thể chạy/test được:
-
-```powershell
-git add .
-git commit -m "feat: <mo-ta-ngan>"
-git push -u origin feature/<ten-task>
-```
-
-Tạo Pull Request từ branch đó vào `main`. PR nên có:
-
-- Mục đích và các file đã thay đổi
-- Input/output của module
-- Lệnh test đã chạy
-- Phần chưa triển khai hoặc giới hạn hiện tại
-
-Trước khi tạo PR, chạy tối thiểu:
-
-```powershell
-python -m pytest
-git diff --check
-git status --short
-```
-
-Không commit secrets, ảnh người dùng, weights lớn hoặc dữ liệu thật vào
-repository. Không code trực tiếp trên `main`.
+- **Không** ghi URI/password vào code hoặc notebook. Dùng `.env` (đã nằm trong `.gitignore`) hoặc Colab Secrets.
+- Nếu từng commit mật khẩu, **hãy đổi mật khẩu ngay** trong Neo4j Aura; xoá file đi vẫn không đủ vì lịch sử Git còn lưu.
+- Cân nhắc có nên đưa 2 file CSV dữ liệu lên repo công khai hay không (xem comment trong `.gitignore`).

@@ -1,0 +1,6 @@
+neo4j
+pykeen
+pandas
+numpy
+torch
+python-dotenv
