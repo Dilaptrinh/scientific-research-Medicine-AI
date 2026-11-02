@@ -67,3 +67,34 @@ class GraphRagService:
             for item in relations
         )
         return "\n".join(lines)
+
+    def supports(self, first: str | None, second: str | None) -> bool:
+        if not first or not second:
+            return False
+        first_key = _normalize(first)
+        second_key = _normalize(second)
+        return any(
+            _normalize(relation.medicine) == first_key
+            and _normalize(relation.supported_by) in second_key
+            or _normalize(relation.medicine) == second_key
+            and _normalize(relation.supported_by) in first_key
+            for relations in self._by_medicine.values()
+            for relation in relations
+        )
+
+    def relations_between(self, medicines: list[str]) -> list[SupportRelation]:
+        return [
+            relation
+            for relation in (
+                item
+                for relations in self._by_medicine.values()
+                for item in relations
+            )
+            if self.supports(relation.medicine, relation.supported_by)
+            and any(
+                _normalize(other) in _normalize(relation.supported_by)
+                or _normalize(relation.supported_by) in _normalize(other)
+                for other in medicines
+                if _normalize(other) != _normalize(relation.medicine)
+            )
+        ]

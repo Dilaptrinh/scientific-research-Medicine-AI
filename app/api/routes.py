@@ -52,6 +52,96 @@ def _graph_rag_context(medicine_name: str | None) -> str:
     ).context(medicine_name)
 
 
+def _local_image_results(decoded: object, root: Path) -> list[tuple[object, object]]:
+    import cv2
+
+    from app.services.detection import YoloDetector
+    from app.services.pill_rag import PillRagService
+
+    detections = YoloDetector(
+        Path(os.getenv("YOLO_MODEL_PATH", root / "models" / "yolo" / "best.pt"))
+    ).detect(decoded, uuid4().hex)
+    if not detections:
+        raise RuntimeError("YOLO không phát hiện được viên thuốc trong ảnh.")
+
+    image_rag = PillRagService.from_paths(
+        index_path=root / "data" / "pill_index" / "pills.index",
+        metadata_path=root / "data" / "pill_index" / "pills.json",
+        knowledge_path=root / "data" / "medicine_knowledge" / "medicines.json",
+        result_top_k=3,
+    )
+    results = []
+    for detection in detections:
+        crop = cv2.imread(detection.crop_path or "")
+        if crop is None:
+            continue
+        results.append((detection, image_rag.search(crop)))
+    if not results:
+        raise RuntimeError("Image RAG không đọc được vùng thuốc do YOLO tạo ra.")
+    return results
+
+
+def _select_local_predictions(
+    results: list[tuple[object, object]],
+) -> tuple[list[object], list[str]]:
+    from app.services.graph_rag import GraphRagService
+
+    graph = GraphRagService.from_csv(Path("docs/graph-neo4j/support.csv"))
+    selected = [
+        result.candidates[0] if result.candidates else None
+        for _, result in results
+    ]
+    warnings: list[str] = []
+    for index, (_, result) in enumerate(results):
+        if not result.candidates:
+            continue
+        best = selected[index]
+        best_score = best.similarity if best else -1
+        for candidate in result.candidates[1:]:
+            support_count = sum(
+                graph.supports(candidate.medicine_name, other.medicine_name)
+                for position, other in enumerate(selected)
+                if position != index and other is not None
+            )
+            adjusted_score = candidate.similarity + 0.05 * support_count
+            if adjusted_score > best_score:
+                best = candidate
+                best_score = adjusted_score
+                warnings.append(
+                    f"Crop {index + 1}: Graph RAG chuyển sang "
+                    f"{candidate.medicine_name} trong top-3."
+                )
+        selected[index] = best
+
+    names = [candidate.medicine_name for candidate in selected if candidate]
+    if len(names) > 1 and not graph.relations_between(names):
+        warnings.append(
+            "Graph RAG không tìm thấy quan hệ hỗ trợ giữa các thuốc được chọn; "
+            "giữ thứ hạng Image RAG và cần xác minh thêm."
+        )
+    return selected, warnings
+
+
+def _prediction_payload(
+    index: int,
+    result: object,
+    candidate: object | None,
+) -> dict[str, object]:
+    if candidate is None:
+        top_k = []
+    else:
+        top_k = [
+            {"medicine_name": item.medicine_name, "similarity": item.similarity}
+            for item in result.candidates
+        ]
+    return {
+        "crop": index + 1,
+        "medicine_name": candidate.medicine_name if candidate else None,
+        "similarity": candidate.similarity if candidate else None,
+        "top_k": top_k,
+    }
+
+
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -236,57 +326,34 @@ async def rag_chat(
         if not isinstance(parsed_history, list):
             raise ValueError("history must be a JSON array.")
 
-        from app.services.detection import YoloDetector
         from app.services.gemini_vision import GeminiVisionService
-        from app.services.pill_rag import PillRagService
 
         root = Path(__file__).resolve().parents[2]
-        image_id = uuid4().hex
-        detections = YoloDetector(
-            Path(os.getenv("YOLO_MODEL_PATH", root / "models" / "yolo" / "best.pt"))
-        ).detect(decoded, image_id)
-        if not detections:
-            raise RuntimeError("YOLO không phát hiện được viên thuốc trong ảnh.")
-
-        image_rag = PillRagService.from_paths(
-            index_path=root / "data" / "pill_index" / "pills.index",
-            metadata_path=root / "data" / "pill_index" / "pills.json",
-            knowledge_path=root / "data" / "medicine_knowledge" / "medicines.json",
-        )
-        best_result = None
-        for detection in detections:
-            crop = cv2.imread(detection.crop_path or "")
-            if crop is None:
+        results = _local_image_results(decoded, root)
+        selected, graph_warnings = _select_local_predictions(results)
+        text_sections = []
+        text_sources = []
+        for candidate in selected:
+            if candidate is None:
                 continue
-            result = image_rag.search(crop)
-            if best_result is None or (
-                result.candidates
-                and (
-                    not best_result.candidates
-                    or result.candidates[0].similarity
-                    > best_result.candidates[0].similarity
-                )
-            ):
-                best_result = result
-        if best_result is None:
-            raise RuntimeError("Image RAG không đọc được vùng thuốc do YOLO tạo ra.")
-
-        medicine_name = (
-            best_result.candidates[0].medicine_name
-            if best_result.candidates
-            else None
-        )
-        text_answer, _, text_source = _text_rag_service().answer(
-            question, medicine_name
-        )
-        graph_context = _graph_rag_context(medicine_name)
+            text_answer, _, text_source = _text_rag_service().answer(
+                question, candidate.medicine_name
+            )
+            text_sections.append(f"{candidate.medicine_name}:\n{text_answer}")
+            if text_source:
+                text_sources.append(text_source)
+        medicine_name = selected[0].medicine_name if selected and selected[0] else None
         context = (
-            f"YOLO detections: {len(detections)} vùng thuốc.\n"
-            f"Image RAG status: {best_result.status}\n"
-            f"Image RAG result:\n{best_result.answer}\n"
-            f"Text RAG result:\n{text_answer}\n"
-            f"Text RAG source: {text_source or 'không có'}\n"
-            f"{graph_context}"
+            f"YOLO detections: {len(results)} vùng thuốc.\n"
+            "Image RAG top-3 và lựa chọn sau Graph RAG:\n"
+            + "\n".join(
+                str(_prediction_payload(index, result, selected[index]))
+                for index, (_, result) in enumerate(results)
+            )
+            + "\nText RAG results:\n"
+            + "\n".join(text_sections)
+            + "\nGraph warnings:\n"
+            + "\n".join(graph_warnings or ["Không có cảnh báo."])
         )
         service = GeminiVisionService()
         answer = service.generate_from_context(question, context, parsed_history)
@@ -324,61 +391,48 @@ async def local_rag_chat(
     if decoded is None:
         raise HTTPException(status_code=400, detail="Uploaded file is not a valid image.")
     try:
-        from app.services.detection import YoloDetector
-        from app.services.pill_rag import PillRagService
-
         root = Path(__file__).resolve().parents[2]
-        detections = YoloDetector(
-            Path(os.getenv("YOLO_MODEL_PATH", root / "models" / "yolo" / "best.pt"))
-        ).detect(decoded, uuid4().hex)
-        if not detections:
-            raise RuntimeError("YOLO không phát hiện được viên thuốc trong ảnh.")
-
-        image_rag = PillRagService.from_paths(
-            index_path=root / "data" / "pill_index" / "pills.index",
-            metadata_path=root / "data" / "pill_index" / "pills.json",
-            knowledge_path=root / "data" / "medicine_knowledge" / "medicines.json",
-        )
-        best_result = None
-        for detection in detections:
-            crop = cv2.imread(detection.crop_path or "")
-            if crop is None:
+        results = _local_image_results(decoded, root)
+        selected, graph_warnings = _select_local_predictions(results)
+        text_sections = []
+        text_sources = []
+        for candidate in selected:
+            if candidate is None:
                 continue
-            result = image_rag.search(crop)
-            if best_result is None or (
-                result.candidates
-                and (
-                    not best_result.candidates
-                    or result.candidates[0].similarity
-                    > best_result.candidates[0].similarity
-                )
-            ):
-                best_result = result
-        if best_result is None:
-            raise RuntimeError("Image RAG không đọc được vùng thuốc do YOLO tạo ra.")
-
-        medicine_name = (
-            best_result.candidates[0].medicine_name
-            if best_result.candidates
-            else None
-        )
-        text_answer, text_medicine, source = _text_rag_service().answer(
-            question, medicine_name
-        )
-        graph_context = _graph_rag_context(text_medicine or medicine_name)
+            text_answer, _, text_source = _text_rag_service().answer(
+                question, candidate.medicine_name
+            )
+            text_sections.append(f"{candidate.medicine_name}:\n{text_answer}")
+            if text_source:
+                text_sources.append(text_source)
+        names = [candidate.medicine_name for candidate in selected if candidate]
         answer = (
-            f"[Image RAG - {best_result.status}]\n{best_result.answer}\n\n"
-            f"[Text RAG]\n{text_answer}\n\n"
-            f"[Graph RAG]\n{graph_context}"
+            "[Image RAG - top-3 từng vùng]\n"
+            + "\n".join(
+                str(_prediction_payload(index, result, selected[index]))
+                for index, (_, result) in enumerate(results)
+            )
+            + "\n\n[Text RAG - từng thuốc]\n"
+            + "\n\n".join(text_sections)
+            + "\n\n[Graph RAG]\n"
+            + "\n".join(graph_warnings or ["Không có cảnh báo."])
         )
+        medicine_name = names[0] if names else None
+        text_medicine = medicine_name
+        source = text_sources[0] if text_sources else None
     except (FileNotFoundError, ValueError, RuntimeError) as error:
         logger.warning("Local RAG chat failed: %s", error)
         raise HTTPException(status_code=503, detail=str(error)) from error
-    candidate = best_result.candidates[0] if best_result.candidates else None
+    candidate = selected[0] if selected and selected[0] else None
     return FullRagResponse(
         answer=answer,
         medicine_name=text_medicine or medicine_name,
         source=source or None,
-        image_status=best_result.status,
+        image_status="match" if candidate else "unknown",
         image_similarity=candidate.similarity if candidate else None,
+        predictions=[
+            _prediction_payload(index, result, selected[index])
+            for index, (_, result) in enumerate(results)
+        ],
+        graph_warnings=graph_warnings,
     )

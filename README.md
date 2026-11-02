@@ -537,8 +537,9 @@ Web chat dùng `POST /api/v1/rag-chat`. Ảnh và câu hỏi được nhận ở
 sau đó chạy theo thứ tự:
 
 ```text
-ảnh → YOLO local → crop thuốc → Image RAG/FAISS local → Text RAG/FAISS local
-     → Graph RAG local (quan hệ hỗ trợ) → kết quả RAG dạng text
+ảnh → YOLO local → nhiều crop thuốc → top-3 Image RAG cho từng crop
+     → Graph RAG re-rank theo quan hệ hỗ trợ → Text RAG riêng từng thuốc
+     → kết quả RAG dạng text
      → Gemini chỉ diễn đạt câu trả lời hội thoại
 ```
 
@@ -547,6 +548,10 @@ context dạng text do các thành phần local tạo ra. Vì vậy YOLO model, 
 FAISS index, Text FAISS index, Graph RAG CSV và knowledge base phải tồn tại
 trên máy local.
 Nếu thiếu artifact, API trả lỗi rõ ràng thay vì tự tạo kết quả giả.
+Nếu một ảnh có nhiều viên, API trả `predictions` riêng cho từng crop và giữ
+top-3 ứng viên Image RAG. Graph RAG chỉ dùng quan hệ hỗ trợ có trong dữ liệu;
+`support.csv` chưa có dữ liệu xung đột thuốc, nên hệ thống cảnh báo khi không
+tìm thấy quan hệ thay vì tự khẳng định hai thuốc xung đột.
 
 Gemini vẫn là thành phần online tùy chọn để diễn đạt câu trả lời. Cấu hình nằm
 trong file `.env` ở thư mục gốc (file này đã được Git bỏ qua), không cần dán biến

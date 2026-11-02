@@ -41,6 +41,8 @@ class TextRagResponse(BaseModel):
 class FullRagResponse(TextRagResponse):
     image_status: str
     image_similarity: float | None = None
+    predictions: list[dict[str, object]] = Field(default_factory=list)
+    graph_warnings: list[str] = Field(default_factory=list)
 
 
 class GeminiVisionResponse(BaseModel):
