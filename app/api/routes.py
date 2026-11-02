@@ -1,3 +1,5 @@
+import logging
+import json
 from pathlib import Path
 from uuid import uuid4
 
@@ -13,6 +15,8 @@ from app.schemas.rag import (
     TextRagResponse,
 )
 from app.schemas.prediction import PredictionResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -157,17 +161,31 @@ async def full_rag_predict(
 async def gemini_vision(
     question: str = Form(...),
     image: UploadFile = File(...),
+    history: str = Form("[]"),
 ) -> GeminiVisionResponse:
     from app.services.gemini_vision import GeminiVisionService
 
     content = await image.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded image is empty.")
     try:
+        parsed_history = json.loads(history)
+        if not isinstance(parsed_history, list):
+            raise ValueError("history must be a JSON array.")
         service = GeminiVisionService()
         answer = service.analyze_image(
             content,
             image.content_type or "application/octet-stream",
             question,
+            parsed_history,
         )
-    except (RuntimeError, ValueError) as error:
+    except (RuntimeError, ValueError, json.JSONDecodeError) as error:
+        logger.warning("Gemini vision request failed: %s", error)
         raise HTTPException(status_code=503, detail=str(error)) from error
+    except Exception as error:  # noqa: BLE001 - never leak an opaque 500
+        logger.exception("Unexpected Gemini vision failure")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Gemini vision failed: {type(error).__name__}: {error}",
+        ) from error
     return GeminiVisionResponse(answer=answer, model=service.model)

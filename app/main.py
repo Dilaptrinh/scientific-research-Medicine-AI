@@ -42,9 +42,20 @@ def run_gemini_cli() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     image_path = Path(input("Đường dẫn ảnh: ").strip().strip('"'))
-    question = input("Câu hỏi: ").strip()
-    answer = GeminiVisionService().analyze_file(image_path, question)
-    print(f"\nGemini trả lời:\n{answer}")
+    service = GeminiVisionService()
+    history = []
+    print("Gemini Vision - nhập 'thoat' để dừng.")
+    while True:
+        question = input("\nBạn: ").strip()
+        if not question or question.lower() in {"thoat", "exit", "quit"}:
+            print("Đã dừng.")
+            return
+        answer = service.analyze_file(image_path, question, history)
+        print(f"\nGemini: {answer}")
+        history.extend([
+            {"role": "user", "parts": [{"text": question}]},
+            {"role": "model", "parts": [{"text": answer}]},
+        ])
 
 
 if __name__ == "__main__":

@@ -537,6 +537,19 @@ Hoặc dùng Swagger với `POST /api/v1/gemini/vision`, gồm hai trường `im
 `question`. Model mặc định là `gemini-3.8-flash`; có thể đổi bằng
 `$env:GEMINI_MODEL`.
 
+Để đàm thoại nhiều lượt, gửi thêm trường `history` dạng JSON. Sau lượt đầu,
+client lưu câu hỏi/trả lời rồi gửi lại ở lượt kế tiếp:
+
+```json
+[
+  {"role": "user", "parts": [{"text": "Thuốc này là thuốc gì?"}]},
+  {"role": "model", "parts": [{"text": "Ảnh cho thấy ..."}]}
+]
+```
+
+Mỗi lượt vẫn gửi lại ảnh cùng câu hỏi mới. Gemini sẽ dùng ảnh và lịch sử để
+trả lời tiếp, không lặp cảnh báo dài nếu đã nói ở lượt trước.
+
 `main` chỉ chứa code đã review. Mỗi task làm trên một branch riêng:
 
 ```text
