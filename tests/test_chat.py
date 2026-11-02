@@ -41,6 +41,16 @@ def test_local_chat_page_is_available() -> None:
     assert "const LOCAL_MODE = true;" in response.text
 
 
+def test_local_chat_accepts_text_without_upload() -> None:
+    response = TestClient(app).post(
+        "/api/v1/local-rag-chat",
+        data={"question": "Spas-agi 60 dùng để làm gì?"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["image_status"] == "not_run"
+
+
 def test_gemini_rejects_non_image_upload() -> None:
     response = TestClient(app).post(
         "/api/v1/gemini/vision",

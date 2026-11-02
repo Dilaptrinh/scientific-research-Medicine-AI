@@ -231,10 +231,15 @@ CHAT_PAGE = """<!doctype html>
   function friendlyError(response, detail) {
     if (response.status === 413) return "Ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 10 MB.";
     if (response.status === 415) return "Tệp bạn chọn không phải ảnh. Hãy chọn JPG, PNG hoặc WEBP.";
-    if (response.status === 503 && /GEMINI_API_KEY/i.test(detail || "")) {
+    const detailText = Array.isArray(detail)
+      ? detail.map((item) => item && item.msg ? item.msg : String(item)).join("; ")
+      : detail && typeof detail === "object"
+        ? (detail.msg || detail.message || JSON.stringify(detail))
+        : String(detail || "");
+    if (response.status === 503 && /GEMINI_API_KEY/i.test(detailText)) {
       return "Máy chủ chưa cấu hình GEMINI_API_KEY. Hãy đặt biến môi trường này rồi khởi động lại server.";
     }
-    if (detail) return detail;
+    if (detailText) return detailText;
     return "Máy chủ trả lỗi " + response.status + ". Vui lòng thử lại.";
   }
 
@@ -297,7 +302,7 @@ CHAT_PAGE = """<!doctype html>
     const bubble = pending.querySelector(".bubble");
     const form = new FormData();
     form.append("question", text);
-    form.append("image", file);
+    if (file) form.append("image", file);
     form.append("history", JSON.stringify(history));
     try {
       const response = await fetch(API + "/rag-chat", { method: "POST", body: form });
