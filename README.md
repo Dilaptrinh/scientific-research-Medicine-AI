@@ -455,6 +455,25 @@ retrieval có nguồn và cảnh báo, tránh để model tự đoán thông tin
 
 ## 8. Chạy Text RAG và Full RAG local
 
+### Hỏi trực tiếp trong terminal VS Code
+
+Không cần chạy HTTP hoặc mở Swagger:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.main
+```
+
+Sau đó nhập câu hỏi tại:
+
+```text
+Câu hỏi: Becacold-E có thành phần chính là gì?
+```
+
+Nhập `thoat` để kết thúc. Index phải được tạo trước bằng
+`scripts/build_text_index.py`.
+
+### Chạy API (tùy chọn)
+
 Khởi động API bằng PowerShell:
 
 ```powershell
