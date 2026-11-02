@@ -8,6 +8,8 @@ from pathlib import Path
 from urllib import error, request
 from typing import Any
 
+from app import config
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "gemini-3.8-flash"

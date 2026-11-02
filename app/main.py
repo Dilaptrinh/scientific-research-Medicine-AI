@@ -5,6 +5,7 @@ import sys
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
+from app import config
 from app.api.routes import router
 from app.web import chat_page
 

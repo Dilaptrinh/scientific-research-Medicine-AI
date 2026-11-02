@@ -543,13 +543,19 @@ context dạng text do các thành phần local tạo ra. Vì vậy YOLO model, 
 FAISS index, Text FAISS index và knowledge base phải tồn tại trên máy local.
 Nếu thiếu artifact, API trả lỗi rõ ràng thay vì tự tạo kết quả giả.
 
-Gemini vẫn là thành phần online tùy chọn để diễn đạt câu trả lời. Không ghi API
-key vào code hoặc Git.
-Sau khi revoke key đã lộ, tạo key mới và đặt trong terminal:
+Gemini vẫn là thành phần online tùy chọn để diễn đạt câu trả lời. Cấu hình nằm
+trong file `.env` ở thư mục gốc (file này đã được Git bỏ qua), không cần dán biến
+môi trường mỗi lần:
 
-```powershell
-$env:GEMINI_API_KEY = "KEY_MOI"
+```text
+GEMINI_API_KEY=điền_key_mới_của_bạn
+GEMINI_MODEL=gemini-3.8-flash
+GEMINI_TIMEOUT=120
+YOLO_MODEL_PATH=models/yolo/best.pt
 ```
+
+Có thể tạo từ mẫu bằng cách copy `.env.example` thành `.env`. Không commit file
+`.env` và không đưa API key vào README hoặc source code.
 
 Chạy hỏi ảnh trong terminal VS Code:
 
