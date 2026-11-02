@@ -534,7 +534,7 @@ Chạy hỏi ảnh trong terminal VS Code:
 ```
 
 Hoặc dùng Swagger với `POST /api/v1/gemini/vision`, gồm hai trường `image` và
-`question`. Model mặc định là `gemini-2.0-flash`; có thể đổi bằng
+`question`. Model mặc định là `gemini-3.8-flash`; có thể đổi bằng
 `$env:GEMINI_MODEL`.
 
 `main` chỉ chứa code đã review. Mỗi task làm trên một branch riêng:

@@ -14,7 +14,7 @@ class GeminiVisionService:
         timeout: int = 60,
     ) -> None:
         self._api_key = api_key or os.getenv("GEMINI_API_KEY")
-        self._model = model or os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        self._model = model or os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
         self._timeout = timeout
         if not self._api_key:
             raise RuntimeError(
