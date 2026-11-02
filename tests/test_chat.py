@@ -19,7 +19,7 @@ def test_user_message_is_rendered_before_image_validation() -> None:
     page = TestClient(app).get("/").text
     ask_body = page[page.index("async function ask()"):]
 
-    assert ask_body.index('add(text, "user")') < ask_body.index("if (!file)")
+    assert ask_body.index('add(text, "user", null, true') < ask_body.index("if (!file)")
 
 
 def test_web_page_is_served_at_root() -> None:

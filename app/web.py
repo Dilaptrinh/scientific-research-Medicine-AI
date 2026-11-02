@@ -41,6 +41,8 @@ CHAT_PAGE = """<!doctype html>
     .bubble { width:fit-content; max-width:100%; padding:12px 15px; line-height:1.55; white-space:pre-wrap;
       border-radius:18px 18px 18px 5px; background:#f0f2f7; overflow-wrap:anywhere; }
     .user .bubble { color:#fff; border-radius:18px 18px 5px 18px; background:linear-gradient(135deg,#6366ef,#4d8de8); }
+    .user .bubble img { display:block; width:min(280px,100%); max-height:220px; margin:-2px 0 9px;
+      object-fit:cover; border-radius:12px; }
     .bubble.error { color:#a12828; background:#fff1f1; }
     .meta { margin:0 4px 5px; color:#9aa3b5; font-size:10px; }
     .typing { display:inline-flex; gap:4px; padding:4px 2px; }
@@ -159,7 +161,7 @@ CHAT_PAGE = """<!doctype html>
     }
   }
 
-  function add(text, role, extraClass, remember = true) {
+  function add(text, role, extraClass, remember = true, imageSrc = null) {
     const welcome = document.querySelector(".welcome");
     if (welcome) welcome.remove();
     const box = document.createElement("div");
@@ -181,6 +183,14 @@ CHAT_PAGE = """<!doctype html>
     bubble.className = "bubble" + (extraClass ? " " + extraClass : "");
     if (text === null) {
       bubble.innerHTML = '<span class="typing"><span></span><span></span><span></span></span>';
+    } else if (role === "user" && imageSrc) {
+      const imagePreview = document.createElement("img");
+      imagePreview.src = imageSrc;
+      imagePreview.alt = "Ảnh thuốc đã gửi";
+      bubble.appendChild(imagePreview);
+      const messageText = document.createElement("div");
+      messageText.textContent = text;
+      bubble.appendChild(messageText);
     } else {
       bubble.textContent = text;
     }
@@ -270,7 +280,8 @@ CHAT_PAGE = """<!doctype html>
     }
     busy = true;
     send.disabled = true;
-    add(text, "user");
+    const messageImageUrl = file ? URL.createObjectURL(file) : null;
+    add(text, "user", null, true, messageImageUrl);
     question.value = "";
     question.style.height = "42px";
     if (!file) {
