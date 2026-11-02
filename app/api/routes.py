@@ -4,6 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from app.web import chat_page
 
 from app.schemas.rag import (
     FullRagResponse,
@@ -19,6 +20,11 @@ from app.schemas.prediction import PredictionResponse
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+@router.get("/chat", include_in_schema=False)
+def chat() -> object:
+    return chat_page()
 
 
 def _text_rag_service():

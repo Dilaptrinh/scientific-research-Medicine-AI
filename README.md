@@ -455,6 +455,17 @@ retrieval có nguồn và cảnh báo, tránh để model tự đoán thông tin
 
 ## 8. Chạy Text RAG và Full RAG local
 
+### Web chat đơn giản
+
+Khởi động server:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+```
+
+Mở <http://127.0.0.1:8000/api/v1/chat>, chọn ảnh thuốc và chat nhiều lượt
+trong cùng một ô chat.
+
 ### Hỏi trực tiếp trong terminal VS Code
 
 Không cần chạy HTTP hoặc mở Swagger:
