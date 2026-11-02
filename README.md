@@ -47,6 +47,9 @@ virtual environment:
 Mỗi thành viên cần tự tạo `.venv` trên máy của mình. Không commit thư mục này
 vào Git; `.gitignore` đã bỏ qua nó. Khi làm việc, kiểm tra interpreter đang dùng:
 
+Repository dùng Git LFS cho model YOLO và ảnh dataset Image RAG. Sau khi clone,
+cài Git LFS và chạy `git lfs pull` để tải đầy đủ các artifact.
+
 ```powershell
 python -c "import sys; print(sys.executable)"
 ```
