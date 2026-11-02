@@ -1,101 +1,145 @@
 import csv
-import re
-import unicodedata
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
-
-def _normalize(value: str) -> str:
-    value = unicodedata.normalize("NFKD", value)
-    value = "".join(char for char in value if not unicodedata.combining(char))
-    return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+import numpy as np
 
 
 @dataclass(frozen=True)
-class MedicineDocument:
-    name: str
-    fields: dict[str, str]
+class TextChunk:
+    medicine_name: str
+    section: str
+    text: str
     source: str
 
 
-class TextRagService:
-    """Local, source-grounded retrieval over the medicine CSV."""
+class TextEmbeddingModel:
+    def __init__(self, model_name: str = "BAAI/bge-m3") -> None:
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError as error:
+            raise RuntimeError(
+                'Install Text RAG dependencies with: pip install -e ".[text-rag]"'
+            ) from error
+        self._model = SentenceTransformer(model_name)
 
-    def __init__(self, documents: list[MedicineDocument]) -> None:
-        if not documents:
-            raise ValueError("Text RAG knowledge base is empty.")
-        self._documents = documents
+    def encode(self, texts: list[str]) -> np.ndarray:
+        return np.asarray(
+            self._model.encode(texts, normalize_embeddings=True),
+            dtype=np.float32,
+        )
+
+
+class TextFaissIndex:
+    def __init__(self, dimension: int) -> None:
+        try:
+            import faiss
+        except ImportError as error:
+            raise RuntimeError(
+                'FAISS is required. Install it with: pip install -e ".[retrieval]"'
+            ) from error
+        self._faiss = faiss
+        self._index = faiss.IndexFlatIP(dimension)
+        self._chunks: list[TextChunk] = []
+
+    def add(self, embeddings: np.ndarray, chunks: list[TextChunk]) -> None:
+        vectors = np.asarray(embeddings, dtype=np.float32)
+        if vectors.ndim != 2 or vectors.shape[1] != self._index.d:
+            raise ValueError(f"Expected embeddings with dimension {self._index.d}.")
+        if len(vectors) != len(chunks):
+            raise ValueError("Each embedding must have one text chunk.")
+        self._faiss.normalize_L2(vectors)
+        self._index.add(vectors)
+        self._chunks.extend(chunks)
+
+    def search(self, embedding: np.ndarray, top_k: int = 6) -> list[tuple[TextChunk, float]]:
+        query = np.asarray(embedding, dtype=np.float32).reshape(1, -1)
+        self._faiss.normalize_L2(query)
+        scores, indices = self._index.search(query, min(top_k, self._index.ntotal))
+        return [
+            (self._chunks[int(index)], float(score))
+            for score, index in zip(scores[0], indices[0])
+            if index >= 0
+        ]
+
+    def save(self, index_path: Path, metadata_path: Path) -> None:
+        index_path.parent.mkdir(parents=True, exist_ok=True)
+        self._faiss.write_index(self._index, str(index_path))
+        metadata_path.write_text(
+            json.dumps([asdict(chunk) for chunk in self._chunks], ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
 
     @classmethod
-    def from_csv(cls, path: Path) -> "TextRagService":
-        if not path.is_file():
-            raise FileNotFoundError(f"Text RAG knowledge base was not found: {path}")
-        with path.open(encoding="utf-8-sig", newline="") as file:
-            reader = csv.DictReader(file)
-            required = {"ten_thuoc", "hoat_chat", "chi_dinh", "lieu_dung",
-                        "chong_chi_dinh", "tac_dung_phu", "luu_y", "nguon"}
-            if not required.issubset(reader.fieldnames or set()):
-                raise ValueError(f"Text RAG CSV is missing columns: {sorted(required)}")
-            documents = [
-                MedicineDocument(
-                    name=row["ten_thuoc"].strip(),
-                    fields={key: (row.get(key) or "").strip() for key in required},
-                    source=(row.get("nguon") or "").strip(),
-                )
-                for row in reader
-                if (row.get("ten_thuoc") or "").strip()
-            ]
-        return cls(documents)
+    def load(cls, index_path: Path, metadata_path: Path) -> "TextFaissIndex":
+        if not index_path.is_file() or not metadata_path.is_file():
+            raise FileNotFoundError(
+                f"Text FAISS index is missing: {index_path} and {metadata_path}"
+            )
+        import faiss
 
-    def answer(self, question: str, medicine_name: str | None = None) -> tuple[str, str, str]:
+        result = cls(faiss.read_index(str(index_path)).d)
+        result._index = faiss.read_index(str(index_path))
+        result._chunks = [
+            TextChunk(**item)
+            for item in json.loads(metadata_path.read_text(encoding="utf-8"))
+        ]
+        if result._index.ntotal != len(result._chunks):
+            raise ValueError("Text FAISS index and metadata counts do not match.")
+        return result
+
+
+class TextRagService:
+    def __init__(self, embedder: TextEmbeddingModel, index: TextFaissIndex) -> None:
+        self._embedder = embedder
+        self._index = index
+
+    @classmethod
+    def from_paths(
+        cls,
+        index_path: Path,
+        metadata_path: Path,
+        model_name: str = "BAAI/bge-m3",
+    ) -> "TextRagService":
+        return cls(TextEmbeddingModel(model_name), TextFaissIndex.load(index_path, metadata_path))
+
+    def answer(
+        self, question: str, medicine_name: str | None = None
+    ) -> tuple[str, str, str]:
         if not question.strip():
             raise ValueError("Question must not be empty.")
-        document = self._find_document(question, medicine_name)
-        if document is None:
-            return (
-                "Chưa xác định được thuốc trong câu hỏi. Hãy nêu tên thuốc hoặc "
-                "gửi ảnh qua endpoint full RAG.",
-                "",
-                "",
-            )
-        field, label = self._find_field(question)
-        if field is None:
-            answer = self._summary(document)
-            field = "summary"
-        else:
-            answer = f"{document.name} - {label}: {document.fields[field]}."
-        return answer, document.name, document.source
-
-    def _find_document(
-        self, question: str, medicine_name: str | None
-    ) -> MedicineDocument | None:
-        haystack = _normalize(f"{medicine_name or ''} {question}")
-        matches = [
-            document for document in self._documents
-            if _normalize(document.name) in haystack
-        ]
-        return max(matches, key=lambda item: len(_normalize(item.name)), default=None)
-
-    @staticmethod
-    def _find_field(question: str) -> tuple[str | None, str]:
-        normalized = _normalize(question)
-        rules = (
-            (("hoat chat", "thanh phan", "thanh phan chinh"), "hoat_chat", "Hoạt chất"),
-            (("dieu tri", "cong dung", "chi dinh", "dung de lam gi"), "chi_dinh", "Chỉ định"),
-            (("lieu", "uống bao nhieu", "su dung the nao"), "lieu_dung", "Liều dùng"),
-            (("chong chi dinh", "khong duoc dung"), "chong_chi_dinh", "Chống chỉ định"),
-            (("tac dung phu", "phan ung phu"), "tac_dung_phu", "Tác dụng phụ"),
-            (("luu y", "can than", "canh bao"), "luu_y", "Lưu ý"),
+        query = f"{medicine_name}: {question}" if medicine_name else question
+        matches = self._index.search(self._embedder.encode([query])[0])
+        if not matches:
+            return "Không tìm thấy tài liệu phù hợp.", medicine_name or "", ""
+        context = "\n".join(
+            f"{chunk.medicine_name} - {chunk.section}: {chunk.text}"
+            for chunk, _ in matches
         )
-        for keywords, field, label in rules:
-            if any(keyword in normalized for keyword in keywords):
-                return field, label
-        return None, ""
+        best = matches[0][0]
+        return context, best.medicine_name, best.source
 
-    @staticmethod
-    def _summary(document: MedicineDocument) -> str:
-        return (
-            f"{document.name}. Hoạt chất: {document.fields['hoat_chat']}. "
-            f"Chỉ định: {document.fields['chi_dinh']}. "
-            f"Lưu ý: {document.fields['luu_y']}."
+
+def chunks_from_csv(path: Path) -> list[TextChunk]:
+    with path.open(encoding="utf-8-sig", newline="") as file:
+        rows = csv.DictReader(file)
+        fields = (
+            ("hoat_chat", "Hoạt chất"),
+            ("dang_bao_che", "Dạng bào chế"),
+            ("chi_dinh", "Chỉ định"),
+            ("lieu_dung", "Liều dùng"),
+            ("chong_chi_dinh", "Chống chỉ định"),
+            ("tac_dung_phu", "Tác dụng phụ"),
+            ("luu_y", "Lưu ý"),
         )
+        chunks = []
+        for row in rows:
+            name = (row.get("ten_thuoc") or "").strip()
+            if name:
+                chunks.extend(
+                    TextChunk(name, label, (row.get(key) or "").strip(), row.get("nguon", ""))
+                    for key, label in fields
+                    if (row.get(key) or "").strip()
+                )
+        return chunks

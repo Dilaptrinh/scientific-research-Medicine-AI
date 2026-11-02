@@ -470,8 +470,20 @@ Mở <http://127.0.0.1:8000/docs>. Text RAG có thể hỏi trực tiếp bằng
 }
 ```
 
-API đọc knowledge base local tại
-`docs/rag-text/thuoc_48.csv`, không cần chạy notebook và không cần GPU.
+Tạo index Text RAG local một lần (lần đầu model embedding có thể cần tải về):
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_text_index.py
+```
+
+Lệnh này đọc `docs/rag-text/thuoc_48.csv` và tạo:
+
+```text
+data/text_index/text.index
+data/text_index/text.json
+```
+
+Sau đó API chỉ đọc FAISS local, không gọi Gemini hay dịch vụ hỏi đáp online.
 
 Khi đã có FAISS image index, dùng `POST /api/v1/full-rag/predict` với:
 

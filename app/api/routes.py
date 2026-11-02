@@ -19,7 +19,10 @@ router = APIRouter()
 def _text_rag_service():
     from app.services.text_rag import TextRagService
 
-    return TextRagService.from_csv(Path("docs/rag-text/thuoc_48.csv"))
+    return TextRagService.from_paths(
+        index_path=Path("data/text_index/text.index"),
+        metadata_path=Path("data/text_index/text.json"),
+    )
 
 
 @router.get("/health")
