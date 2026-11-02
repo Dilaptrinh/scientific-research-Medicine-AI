@@ -1,15 +1,32 @@
+import os
 from pathlib import Path
 import sys
 
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 
 from app.api.routes import router
+from app.web import chat_page
 
 app = FastAPI(
     title="Medicine AI Research API",
     version="0.1.0",
 )
 app.include_router(router, prefix="/api/v1")
+
+
+@app.get("/", include_in_schema=False)
+def index() -> HTMLResponse:
+    return chat_page()
+
+
+def run_web() -> None:
+    import uvicorn
+
+    host = os.getenv("HOST", "127.0.0.1")
+    port = int(os.getenv("PORT", "8000"))
+    print(f"Mở web tại http://{host}:{port}/")
+    uvicorn.run("app.main:app", host=host, port=port)
 
 
 def run_text_rag_cli() -> None:
@@ -59,7 +76,9 @@ def run_gemini_cli() -> None:
 
 
 if __name__ == "__main__":
-    if "--gemini" in sys.argv:
+    if "--web" in sys.argv:
+        run_web()
+    elif "--gemini" in sys.argv:
         run_gemini_cli()
     else:
         run_text_rag_cli()

@@ -20,6 +20,7 @@ from app.schemas.prediction import PredictionResponse
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+MAX_GEMINI_IMAGE_BYTES = 10 * 1024 * 1024
 
 
 @router.get("/chat", include_in_schema=False)
@@ -174,6 +175,10 @@ async def gemini_vision(
     content = await image.read()
     if not content:
         raise HTTPException(status_code=400, detail="Uploaded image is empty.")
+    if len(content) > MAX_GEMINI_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="Image must be smaller than 10 MB.")
+    if image.content_type and not image.content_type.startswith("image/"):
+        raise HTTPException(status_code=415, detail="Uploaded file must be an image.")
     try:
         parsed_history = json.loads(history)
         if not isinstance(parsed_history, list):
