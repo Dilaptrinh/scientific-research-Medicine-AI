@@ -1,0 +1,39 @@
+[
+  {
+    "model_name": "ResNet",
+    "run_id": "20261008T153712_898887Z_seed43_f183e87a",
+    "soup_type": "uniform",
+    "checkpoint_path": "/content/drive/MyDrive/project_outputs/checkpoints/ResNet/20261008T153712_898887Z_seed43_f183e87a/soups/uniform_soup.pt",
+    "source_checkpoints": [
+      "/content/drive/MyDrive/project_outputs/checkpoints/ResNet/20261008T153712_898887Z_seed43_f183e87a/epoch_016.pt",
+      "/content/drive/MyDrive/project_outputs/checkpoints/ResNet/20261008T153712_898887Z_seed43_f183e87a/epoch_013.pt",
+      "/content/drive/MyDrive/project_outputs/checkpoints/ResNet/20261008T153712_898887Z_seed43_f183e87a/epoch_011.pt",
+      "/content/drive/MyDrive/project_outputs/checkpoints/ResNet/20261008T153712_898887Z_seed43_f183e87a/epoch_017.pt",
+      "/content/drive/MyDrive/project_outputs/checkpoints/ResNet/20261008T153712_898887Z_seed43_f183e87a/epoch_015.pt"
+    ],
+    "number_of_checkpoints": 5,
+    "validation_loss": 0.3756824459009503,
+    "validation_accuracy": 0.9850746268656716,
+    "validation_f1": 0.9849933001698035,
+    "construction_time_seconds": 41.786572856999555,
+    "split_fingerprint": "5779038e7a68a089dcfa36f24c297975d250d7c3598d5bda90efea0bd3aaae5b"
+  },
+  {
+    "model_name": "ResNet",
+    "run_id": "20261008T153712_898887Z_seed43_f183e87a",
+    "soup_type": "greedy",
+    "checkpoint_path": "/content/drive/MyDrive/project_outputs/checkpoints/ResNet/20261008T153712_898887Z_seed43_f183e87a/soups/greedy_soup.pt",
+    "source_checkpoints": [
+      "/content/drive/MyDrive/project_outputs/checkpoints/ResNet/20261008T153712_898887Z_seed43_f183e87a/epoch_016.pt",
+      "/content/drive/MyDrive/project_outputs/checkpoints/ResNet/20261008T153712_898887Z_seed43_f183e87a/epoch_013.pt",
+      "/content/drive/MyDrive/project_outputs/checkpoints/ResNet/20261008T153712_898887Z_seed43_f183e87a/epoch_011.pt",
+      "/content/drive/MyDrive/project_outputs/checkpoints/ResNet/20261008T153712_898887Z_seed43_f183e87a/epoch_017.pt"
+    ],
+    "number_of_checkpoints": 4,
+    "validation_loss": 0.37593048959229125,
+    "validation_accuracy": 0.9875621890547264,
+    "validation_f1": 0.9873768007506057,
+    "construction_time_seconds": 41.786572856999555,
+    "split_fingerprint": "5779038e7a68a089dcfa36f24c297975d250d7c3598d5bda90efea0bd3aaae5b"
+  }
+]
