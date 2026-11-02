@@ -1,16 +1,25 @@
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.schemas.rag import (
+    FullRagResponse,
     PillRagResponse,
     RagCandidateResponse,
     RagKnowledgeResponse,
+    TextRagRequest,
+    TextRagResponse,
 )
 from app.schemas.prediction import PredictionResponse
 
 router = APIRouter()
+
+
+def _text_rag_service():
+    from app.services.text_rag import TextRagService
+
+    return TextRagService.from_csv(Path("docs/rag-text/thuoc_48.csv"))
 
 
 @router.get("/health")
@@ -89,4 +98,52 @@ async def predict_pill_crop(image: UploadFile = File(...)) -> PillRagResponse:
         threshold=result.threshold,
         answer=result.answer,
         candidates=candidates,
+    )
+
+
+@router.post("/text-rag/query", response_model=TextRagResponse)
+async def text_rag_query(request: TextRagRequest) -> TextRagResponse:
+    try:
+        answer, medicine_name, source = _text_rag_service().answer(request.question)
+    except (FileNotFoundError, ValueError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    return TextRagResponse(
+        answer=answer,
+        medicine_name=medicine_name or None,
+        source=source or None,
+    )
+
+
+@router.post("/full-rag/predict", response_model=FullRagResponse)
+async def full_rag_predict(
+    question: str = Form(...),
+    image: UploadFile = File(...),
+) -> FullRagResponse:
+    import cv2
+    import numpy as np
+
+    content = await image.read()
+    decoded = cv2.imdecode(np.frombuffer(content, np.uint8), cv2.IMREAD_COLOR)
+    if decoded is None:
+        raise HTTPException(status_code=400, detail="Uploaded file is not a valid image.")
+    try:
+        from app.services.pill_rag import PillRagService
+
+        image_result = PillRagService.from_paths(
+            index_path=Path("data/pill_index/pills.index"),
+            metadata_path=Path("data/pill_index/pills.json"),
+            knowledge_path=Path("data/medicine_knowledge/medicines.json"),
+        ).search(decoded)
+        candidate = image_result.candidates[0] if image_result.candidates else None
+        answer, medicine_name, source = _text_rag_service().answer(
+            question, candidate.medicine_name if candidate else None
+        )
+    except (FileNotFoundError, ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    return FullRagResponse(
+        answer=answer,
+        medicine_name=medicine_name or (candidate.medicine_name if candidate else None),
+        source=source or None,
+        image_status=image_result.status,
+        image_similarity=candidate.similarity if candidate else None,
     )

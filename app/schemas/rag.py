@@ -26,3 +26,18 @@ class PillRagResponse(BaseModel):
     threshold: float = Field(ge=0, le=1)
     answer: str
     candidates: list[RagCandidateResponse]
+
+
+class TextRagRequest(BaseModel):
+    question: str = Field(min_length=1)
+
+
+class TextRagResponse(BaseModel):
+    answer: str
+    medicine_name: str | None = None
+    source: str | None = None
+
+
+class FullRagResponse(TextRagResponse):
+    image_status: str
+    image_similarity: float | None = None

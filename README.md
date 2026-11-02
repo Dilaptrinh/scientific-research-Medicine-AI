@@ -453,6 +453,36 @@ retrieval có nguồn và cảnh báo, tránh để model tự đoán thông tin
 
 ## 7. Quy trình Git và Pull Request
 
+## 8. Chạy Text RAG và Full RAG local
+
+Khởi động API bằng PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+```
+
+Mở <http://127.0.0.1:8000/docs>. Text RAG có thể hỏi trực tiếp bằng
+`POST /api/v1/text-rag/query`:
+
+```json
+{
+  "question": "Becacold-E có thành phần chính là gì?"
+}
+```
+
+API đọc knowledge base local tại
+`docs/rag-text/thuoc_48.csv`, không cần chạy notebook và không cần GPU.
+
+Khi đã có FAISS image index, dùng `POST /api/v1/full-rag/predict` với:
+
+- `image`: ảnh crop viên thuốc;
+- `question`: câu hỏi, ví dụ `Thuốc này dùng để điều trị bệnh gì?`.
+
+Endpoint sẽ nhận diện thuốc bằng Image RAG trước, sau đó truyền tên thuốc vào
+Text RAG để trả lời. Image index cần được tạo trước bằng
+`scripts/build_pill_index.py`; nếu chưa có `data/pill_index/pills.index` và
+`pills.json`, endpoint sẽ trả HTTP 503 thay vì giả kết quả.
+
 `main` chỉ chứa code đã review. Mỗi task làm trên một branch riêng:
 
 ```text
