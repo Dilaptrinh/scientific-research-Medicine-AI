@@ -1,5 +1,7 @@
 import csv
 import json
+import re
+import unicodedata
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -13,6 +15,22 @@ class TextChunk:
     section: str
     text: str
     source: str
+
+
+def _normalize_medicine_name(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value.casefold())
+    normalized = "".join(
+        char for char in normalized if not unicodedata.combining(char)
+    )
+    return re.sub(r"[^a-z0-9]+", " ", normalized).strip()
+
+
+def _medicine_name_matches(chunk_name: str, query_name: str) -> bool:
+    chunk = _normalize_medicine_name(chunk_name)
+    query = _normalize_medicine_name(query_name)
+    if not chunk or not query:
+        return False
+    return chunk in query or query in chunk
 
 
 class TextEmbeddingModel:
@@ -72,6 +90,10 @@ class TextFaissIndex:
         self._index.add(vectors)
         self._chunks.extend(chunks)
 
+    @property
+    def size(self) -> int:
+        return self._index.ntotal
+
     def search(self, embedding: np.ndarray, top_k: int = 6) -> list[tuple[TextChunk, float]]:
         query = np.asarray(embedding, dtype=np.float32).reshape(1, -1)
         self._faiss.normalize_L2(query)
@@ -122,8 +144,19 @@ class TextRagService:
     def answer(self, question: str, medicine_name: str | None = None) -> tuple[str, str, str]:
         if not question.strip():
             raise ValueError("Question must not be empty.")
+        if self._index.size == 0:
+            return "Không tìm thấy tài liệu phù hợp.", medicine_name or "", ""
         query = f"{medicine_name}: {question}" if medicine_name else question
-        matches = self._index.search(self._embedder.encode([query])[0])
+        matches = self._index.search(
+            self._embedder.encode([query])[0],
+            top_k=max(self._index.size, 1),
+        )
+        if medicine_name:
+            matches = [
+                (chunk, score)
+                for chunk, score in matches
+                if _medicine_name_matches(chunk.medicine_name, medicine_name)
+            ]
         if not matches:
             return "Không tìm thấy tài liệu phù hợp.", medicine_name or "", ""
         context = "\n".join(

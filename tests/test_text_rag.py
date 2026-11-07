@@ -60,3 +60,14 @@ def test_text_rag_can_use_image_candidate_name() -> None:
 
     assert medicine_name == "Coxileb 200"
     assert "Chỉ định" in answer
+
+
+def test_text_rag_does_not_mix_other_medicines_for_candidate_name() -> None:
+    answer, medicine_name, _ = service().answer(
+        "Thuốc này có hoạt chất gì?",
+        medicine_name="Coxileb 200",
+    )
+
+    assert medicine_name == "Coxileb 200"
+    assert "Giảm đau" in answer
+    assert "Becacold-E" not in answer
